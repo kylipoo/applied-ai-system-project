@@ -132,7 +132,7 @@ You will go deeper on this in your model card.
 ---
 
 - Limitations encountered during planning:
-  - I had run my original user profile with inline chat and they had a criticsm that "intense rock" and "chill lofi" were differentiated for the wrong reasons (through target energy, not because it understood "intense" and "chill" as moods).
+  - I had run my original user profile with inline chat and they had a criticism that "intense rock" and "chill lofi" were differentiated for the wrong reasons (through target energy, not because it understood "intense" and "chill" as moods).
   - Mood is considered binary matching, a favorite mood of "happy" will consider both "intense" and "chill" as 0 equally.
   - Genre is too narrow. With "pop" as a target, a high-energy rock track would score worse than a mid-energy pop track. Just because the genre is different doesn't mean the user wouldn't have liked the "rock" example.
   - No tempo signal. Stuff like intense rock and chill lofi would be most cleanly separated by tempo (152 bpm and 72 bpm respectively).
