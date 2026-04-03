@@ -115,7 +115,7 @@ You do not need a numeric metric, but if you used one, explain what it measures.
 ---
 
 - I added multiple user profiles with differing genre preferences and went through each one seeing if the calculated results matched my expectations.
-- **High-Energy Pop vs Chill Lofi:** These two profiles are complete opposites. The Pop profile targets energy 0.90 with non-acoustic pop songs in a happy mood, while Chill Lofi targets energy 0.35 with acoustic lofi tracks in a chill mood. The outputs reflected this cleanly — Pop surfaced high-tempo, electric tracks like "Gym Hero" and "Moskau," while Lofi returned quiet, acoustic songs like "Library Rain" and "Midnight Coding." The contrast makes sense because every attribute (energy, genre, mood, acousticness) points in opposite directions.
+- **High-Energy Pop vs Chill Lofi:** These two profiles are complete opposites. The Pop profile targets energy 0.90 with non-acoustic pop songs in a happy mood, while Chill Lofi targets energy 0.35 with acoustic lofi tracks in a chill mood. The outputs reflected this cleanly — Pop surfaced high-tempo, electric tracks while Lofi returned quiet, acoustic songs like "Library Rain" and "Midnight Coding." The contrast makes sense because every attribute (energy, genre, mood, acousticness) points in opposite directions.
   - **High-Energy Pop**:![alt text](<Screenshot 2026-04-03 at 11.10.45 AM.jpg>)
   - **Chill Lofi**: ![alt text](<Screenshot 2026-04-03 at 11.10.51 AM.jpg>)
 
