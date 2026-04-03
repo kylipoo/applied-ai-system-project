@@ -272,26 +272,26 @@ You do not need a numeric metric, but if you used one, explain what it measures.
 
 - I added multiple user profiles with differing genre preferences and went through each one seeing if the calculated results matched my expectations.
 - **High-Energy Pop vs Chill Lofi:** These two profiles are complete opposites. The Pop profile targets energy 0.90 with non-acoustic pop songs in a happy mood, while Chill Lofi targets energy 0.35 with acoustic lofi tracks in a chill mood. The outputs reflected this cleanly — Pop surfaced high-tempo, electric tracks like "Gym Hero" and "Moskau," while Lofi returned quiet, acoustic songs like "Library Rain" and "Midnight Coding." The contrast makes sense because every attribute (energy, genre, mood, acousticness) points in opposite directions.
-  -  **High-Energy Pop**: /Users/matthew/Pictures/Screenshots/Test Cases Before change weights/Screenshot 2026-04-03 at 11.10.45 AM.jpg
-  - **Chill Lofi**: /Users/matthew/Pictures/Screenshots/Test Cases Before change weights/Screenshot 2026-04-03 at 11.10.51 AM.jpg
+  -  **High-Energy Pop**:![alt text](<Screenshot 2026-04-03 at 11.10.45 AM.jpg>)
+  - **Chill Lofi**: ![alt text](<Screenshot 2026-04-03 at 11.10.51 AM.jpg>)
 
 
 - **High-Energy Pop vs Deep Intense Rock:** Both profiles want high energy (0.90 vs 0.92) and neither likes acoustic. The difference is genre and mood — Pop wants happy, Rock wants intense. Because energy carries the highest weight (0.40) and genre only 0.20, some high-energy songs that don't match either genre can still score competitively for both profiles. The Rock profile correctly pulls intense rock tracks like "Storm Runner" and "Holding Out for a Hero," while the Pop profile favors upbeat tracks — but the energy overlap means both profiles can occasionally surface the same songs.
-  - **High-Energy Pop**: /Users/matthew/Pictures/Screenshots/Test Cases Before change weights/Screenshot 2026-04-03 at 11.10.45 AM.jpg
-  - **Deep Intense Rock**:  /Users/matthew/Pictures/Screenshots/Test Cases Before change weights/Screenshot 2026-04-03 at 11.10.56 AM.jpg
+  - **High-Energy Pop**: ![alt text](<Screenshot 2026-04-03 at 11.10.45 AM.jpg>)
+  - **Deep Intense Rock**:  ![alt text](<Screenshot 2026-04-03 at 11.10.56 AM.jpg>)
 
 - **Chill Lofi vs Lofi Rager:** Both want lofi, but the Lofi Rager wants intense mood and 0.90 energy — which no lofi song in the catalog actually has. Every lofi track is chill or focused at low energy (~0.35–0.42), so the Lofi Rager\'s mood score is always 0. The system falls back on energy proximity alone, returning the same lofi songs as the Chill Lofi profile but ranked differently. The outputs look similar on the surface but for completely different (and broken) reasons.
-  -**Chill Lofi**: /Users/matthew/Pictures/Screenshots/Test Cases Before change weights/Screenshot 2026-04-03 at 11.10.51 AM.jpg
-  -**Lofi Rager**: /Users/matthew/Pictures/Screenshots/Test Cases Before change weights/Screenshot 2026-04-03 at 11.22.03 AM.jpg
+  - **Chill Lofi**: ![alt text](<Screenshot 2026-04-03 at 11.10.51 AM.jpg>)
+  - **Lofi Rager**:  ![alt text](<Screenshot 2026-04-03 at 11.22.03 AM.jpg>)
 
 - **Deep Intense Rock vs Lofi Rager:** Both target high energy (~0.90+) and non-acoustic. Rock gets excellent results because the catalog has many intense rock songs that match all its attributes. The Lofi Rager, despite having the same energy target, gets poor results because there are no high-energy lofi songs: It is a paradox because Lofi tends to be low-energy. This pair best shows how catalog coverage — not just the scoring formula — determines whether a profile gets useful recommendations.
-  - **Deep Intense Rock**:  /Users/matthew/Pictures/Screenshots/Test Cases Before change weights/Screenshot 2026-04-03 at 11.10.56 AM.jpg
-  -**Lofi Rager**: /Users/matthew/Pictures/Screenshots/Test Cases Before change weights/Screenshot 2026-04-03 at 11.22.03 AM.jpg
+  - **Deep Intense Rock**:  ![alt text](<Screenshot 2026-04-03 at 11.10.56 AM.jpg>)
+  - **Lofi Rager**:  ![alt text](<Screenshot 2026-04-03 at 11.22.03 AM.jpg>)
 
 
 
 - Example for high-energy pop calculations:
-- /Users/matthew/Pictures/Screenshots/Test Cases Before change weights/Screenshot 2026-04-03 at 11.16.33 AM.jpg
+- ![alt text](<Screenshot 2026-04-03 at 11.16.33 AM.jpg>)
 
 ## 8. Future Work
 
