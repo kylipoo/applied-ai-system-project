@@ -119,7 +119,7 @@ You do not need a numeric metric, but if you used one, explain what it measures.
   - **High-Energy Pop**:![alt text](<Screenshot 2026-04-03 at 11.10.45 AM.jpg>)
   - **Chill Lofi**: ![alt text](<Screenshot 2026-04-03 at 11.10.51 AM.jpg>)
 
-- **High-Energy Pop vs Deep Intense Rock:** Both profiles want high energy (0.90 vs 0.92) and neither likes acoustic. The difference is genre and mood — Pop wants happy, Rock wants intense. Because energy carries the highest weight (0.40) and genre only 0.20, some high-energy songs that don't match either genre can still score competitively for both profiles. The Rock profile correctly pulls intense rock tracks like "Storm Runner" and "Holding Out for a Hero," while the Pop profile favors upbeat tracks — but the energy overlap means both profiles can occasionally surface the same songs.
+- **High-Energy Pop vs Deep Intense Rock:** Both profiles want high energy (0.90 vs 0.92) and neither likes acoustic. The difference is genre and mood — Pop wants happy, Rock wants intense. Because genre carries the highest weight (0.40) and energy only 0.20, some songs with a matching genre but not-matching energy can still score competitively for both profiles. The Rock profile correctly pulls intense rock tracks like "Storm Runner" and "Holding Out for a Hero," while the Pop profile favors upbeat tracks — but the energy overlap means both profiles can occasionally surface the same songs.
   - **High-Energy Pop**: ![alt text](<Screenshot 2026-04-03 at 11.10.45 AM.jpg>)
   - **Deep Intense Rock**: ![alt text](<Screenshot 2026-04-03 at 11.10.56 AM.jpg>)
 
