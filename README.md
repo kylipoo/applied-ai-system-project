@@ -113,6 +113,10 @@ Use this section to document the experiments you ran. For example:
 
 ---
 
+- I created an anomaly profile where they wanted a "Lo-fi rager" which sounds contradictory because lo-fi is known for being calm and meant to be something you can play in the background while you do something else.
+- I found that when I ran the algorithm recipe, that the scored results were comparatively lower.
+- HOWEVER, when I redistributed the weights to give the energy more weight, this shifted the recommendations to be higher.
+
 ## Limitations and Risks
 
 Summarize some limitations of your recommender.
@@ -147,6 +151,9 @@ Write 1 to 2 paragraphs here about what you learned:
 
 ---
 
+- Building this recommender showed me that turning data into predictions is really about encoding assumptions and discerning patterns. Every weight in score_song is a judgement call: The system scores songs by weighing numeric attributes such as energy or tempo against a user's stated preferences, then ranks by closeness. That sounds objective, but then the weights are the deciding factor in what "close enough" means. Doubling the energy from 0.2->0.4 completely changed song scores and which ones surfaced, even for users where said genre was top priority. The prediction isn't from the data, it's from choices basked into the formula.
+- The bias risk follows directly from that. If the catalog underrepresents certain genres or moods, users with those preferences get worse results through no fault of the algorithm — it's just working with incomplete data. The "Lofi Rager" profile in the code is a clear example: a user who wants intense, high-energy lofi gets broken recommendations because that niche doesn't exist in the dataset. In a real product, that pattern would fall hardest on listeners with niche or non-mainstream tastes, while users who prefer well-catalogued genres like pop consistently get better results. The system appears fair because it applies the same formula to everyone, but equal treatment of unequal data still produces unequal outcomes.
+
 ## 7. `model_card_template.md`
 
 Combines reflection and model card framing from the Module 3 guidance. :contentReference[oaicite:2]{index=2}
@@ -174,18 +181,31 @@ Example:
 
 ---
 
-- This model suggests 3 to 5 songs from a small catalog based on a user's preferred genre, mood, energy and after consulting inline chat, now also checks **target_tempo**.
+- This model suggests the top k songs (I can change how much is returned) from a small catalog based on a user's preferred genre, mood, energy and after consulting inline chat, now also checks **target_tempo**. It is for classroom exploration only, not meant to be reflective of real-world case-studies.
 
 
 ## 3. How It Works (Short Explanation)
 
-Describe your scoring logic in plain language.
+For each song in the catalog, the recommender gives it a score between 0 and 1 by comparing five things about the song to what the user told us they like. The higher the score, the better the match.
 
-- What features of each song does it consider
-- What information about the user does it use
-- How does it turn those into a number
+**What it looks at in each song:**
+- Genre (e.g. pop, rock, lofi)
+- Mood (e.g. happy, intense, chill)
+- Energy level — a number from 0 to 1 representing how high-energy or low-key the song feels
+- Tempo — how fast the song is, measured in beats per minute
+- Acousticness — how acoustic vs. electronic the song sounds
 
-Try to avoid code in this section, treat it like an explanation to a non programmer.
+**What it knows about the user:**
+- Their favorite genre and favorite mood
+- Their preferred energy level (a target they want songs to match)
+- Their preferred tempo
+- Whether they like acoustic-sounding music or not
+
+**How it turns those into a number:**
+
+Each of the five features gets its own mini-score from 0 to 1. Genre and mood are all-or-nothing — a song either matches or it doesn't. Energy, tempo, and acousticness are gradual — a song that's close to your target scores nearly as well as a perfect match, and one that's far away scores lower.
+
+Those five mini-scores are then combined into one final score using a weighted average. Energy is weighted the most heavily (40%), meaning a song that matches your energy preference will rise to the top even if the genre or mood isn't a perfect fit. Mood is second (25%), followed by genre (20%), tempo (10%), and acousticness (5%). The top-scoring songs are returned as your recommendations.
 
 ---
 
@@ -200,16 +220,25 @@ Describe your dataset.
 
 ---
 
+- There are 27 songs in songs.csv.
+- I added 17 more songs.
+- The genres/moods MOST represented are pop, lo-fi, rock. Some suggestions AI gave along the way included jazz.
+- The taste this data mostly reflects are contemporary audiences.
+
 ## 5. Strengths
-
-Where does your recommender work well
-
 You can think about:
 - Situations where the top results "felt right"
 - Particular user profiles it served well
 - Simplicity or transparency benefits
 
+
 ---
+
+The recommender works best when a user's preferences are clear and consistent — particularly when their favorite genre, mood, and energy level all point in the same direction. The High-Energy Pop profile is a good example: songs like Moskau and Rasputin scored near-perfectly because they matched on every dimension at once, and the results felt intuitive.
+
+It also handles energy-first listeners well. After reweighting energy to 40%, a user who cares most about how a song *feels* (high-drive, fast-paced) will surface strong matches even across genre lines — Storm Runner or Gym Hero appearing near the top for an energetic profile makes sense even if the genre isn't an exact fit.
+
+The scoring is also fully transparent. Every score can be broken down into its five components, and the explanation text tells the user exactly why a song was recommended. There are no hidden factors or black-box behavior — a teacher or student can trace any result back to the math.
 
 ## 6. Limitations and Bias
 
@@ -222,6 +251,11 @@ Some prompts:
 - How could this be unfair if used in a real product
 
 ---
+
+- Genre and mood matches are an all-or-nothing match (either 1.0 or 0.0). So a song that's "jazz" when you want "blues" would score identical to a song in a totally unrelated genre. This ignores real inspirations that genres could have taken from each other.
+- Placing too much stock in energy in my experiment of changing weights means that unrelated results get scored higher.
+- Will require very precise preferences. For example, conflicting profiles with intense mood/high energy and being in the lo-fi genre will choose results where the mood always scores 0. The system has no fallback, it just returns songs with the closest energy.
+- Certain genres, moods or energy are sparse in the data-set, so users with preferences like reggae or classic might get worse recommendations.
 
 ## 7. Evaluation
 
@@ -236,6 +270,29 @@ You do not need a numeric metric, but if you used one, explain what it measures.
 
 ---
 
+- I added multiple user profiles with differing genre preferences and went through each one seeing if the calculated results matched my expectations.
+- **High-Energy Pop vs Chill Lofi:** These two profiles are complete opposites. The Pop profile targets energy 0.90 with non-acoustic pop songs in a happy mood, while Chill Lofi targets energy 0.35 with acoustic lofi tracks in a chill mood. The outputs reflected this cleanly — Pop surfaced high-tempo, electric tracks like "Gym Hero" and "Moskau," while Lofi returned quiet, acoustic songs like "Library Rain" and "Midnight Coding." The contrast makes sense because every attribute (energy, genre, mood, acousticness) points in opposite directions.
+  -  **High-Energy Pop**: /Users/matthew/Pictures/Screenshots/Test Cases Before change weights/Screenshot 2026-04-03 at 11.10.45 AM.jpg
+  - **Chill Lofi**: /Users/matthew/Pictures/Screenshots/Test Cases Before change weights/Screenshot 2026-04-03 at 11.10.51 AM.jpg
+
+
+- **High-Energy Pop vs Deep Intense Rock:** Both profiles want high energy (0.90 vs 0.92) and neither likes acoustic. The difference is genre and mood — Pop wants happy, Rock wants intense. Because energy carries the highest weight (0.40) and genre only 0.20, some high-energy songs that don't match either genre can still score competitively for both profiles. The Rock profile correctly pulls intense rock tracks like "Storm Runner" and "Holding Out for a Hero," while the Pop profile favors upbeat tracks — but the energy overlap means both profiles can occasionally surface the same songs.
+  - **High-Energy Pop**: /Users/matthew/Pictures/Screenshots/Test Cases Before change weights/Screenshot 2026-04-03 at 11.10.45 AM.jpg
+  - **Deep Intense Rock**:  /Users/matthew/Pictures/Screenshots/Test Cases Before change weights/Screenshot 2026-04-03 at 11.10.56 AM.jpg
+
+- **Chill Lofi vs Lofi Rager:** Both want lofi, but the Lofi Rager wants intense mood and 0.90 energy — which no lofi song in the catalog actually has. Every lofi track is chill or focused at low energy (~0.35–0.42), so the Lofi Rager\'s mood score is always 0. The system falls back on energy proximity alone, returning the same lofi songs as the Chill Lofi profile but ranked differently. The outputs look similar on the surface but for completely different (and broken) reasons.
+  -**Chill Lofi**: /Users/matthew/Pictures/Screenshots/Test Cases Before change weights/Screenshot 2026-04-03 at 11.10.51 AM.jpg
+  -**Lofi Rager**: /Users/matthew/Pictures/Screenshots/Test Cases Before change weights/Screenshot 2026-04-03 at 11.22.03 AM.jpg
+
+- **Deep Intense Rock vs Lofi Rager:** Both target high energy (~0.90+) and non-acoustic. Rock gets excellent results because the catalog has many intense rock songs that match all its attributes. The Lofi Rager, despite having the same energy target, gets poor results because there are no high-energy lofi songs: It is a paradox because Lofi tends to be low-energy. This pair best shows how catalog coverage — not just the scoring formula — determines whether a profile gets useful recommendations.
+  - **Deep Intense Rock**:  /Users/matthew/Pictures/Screenshots/Test Cases Before change weights/Screenshot 2026-04-03 at 11.10.56 AM.jpg
+  -**Lofi Rager**: /Users/matthew/Pictures/Screenshots/Test Cases Before change weights/Screenshot 2026-04-03 at 11.22.03 AM.jpg
+
+
+
+- Example for high-energy pop calculations:
+- /Users/matthew/Pictures/Screenshots/Test Cases Before change weights/Screenshot 2026-04-03 at 11.16.33 AM.jpg
+
 ## 8. Future Work
 
 If you had more time, how would you improve this recommender
@@ -245,8 +302,9 @@ Examples:
 - Add support for multiple users and "group vibe" recommendations
 - Balance diversity of songs instead of always picking the closest match
 - Use more features, like tempo ranges or lyric themes
-
 ---
+- I would add more diverse genres and balance the current selection out.
+- I would add more attributes like what kind of instruments are being used, the volume, if the song contains any mature themes.
 
 ## 9. Personal Reflection
 
@@ -257,3 +315,9 @@ A few sentences about what you learned:
 - Where do you think human judgment still matters, even if the model seems "smart"
 
 ```
+
+Building this system revealed how every weight/score is a trade-off — boosting energy matching means a song with the perfect vibe but the "wrong" genre can outrank something that's a much better fit on paper. That tension made me realize how much a real music recommender has to balance, and how those decisions are never neutral.
+
+It also changed how I think about the scope of the problem. Music taste isn't static — genres like K-pop and video game OSTs have exploded in popularity and carry cultural context that a set of numeric attributes can't capture. A system built today on today's catalog will drift out of alignment with listeners faster than the weights can be retuned.
+
+That's where human judgment still matters most. A score derived from energy, tempo_bpm, and valence can tell you a song is similar on the surface, but it can't tell you that a track feels like a rainy afternoon, or that it's the one song from a game that defined someone's childhood. Firsthand listening — and the editorial instinct that comes with it — carries meaning that no feature vector can fully represent.
