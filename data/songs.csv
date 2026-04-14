@@ -26,3 +26,21 @@ id,title,artist,genre,mood,energy,tempo_bpm,valence,danceability,acousticness
 25,Despacito,Luis Fonsi,latin,relaxed,0.65,89,0.83,0.77,0.31
 26,Lose Control,Missy Elliott,hip-hop,happy,0.83,102,0.87,0.90,0.06
 27,No Woman No Cry,Bob Marley,reggae,relaxed,0.45,75,0.80,0.48,0.72
+28,So What,Miles Davis,jazz,relaxed,0.32,92,0.55,0.38,0.88
+29,Take Five,Dave Brubeck Quartet,jazz,focused,0.40,174,0.48,0.44,0.83
+30,Fly Me to the Moon,Frank Sinatra,jazz,happy,0.58,144,0.82,0.65,0.74
+31,The Thrill Is Gone,B.B. King,blues,moody,0.52,62,0.38,0.45,0.70
+32,Sweet Home Chicago,Robert Johnson,blues,happy,0.64,104,0.76,0.62,0.85
+33,Mannish Boy,Muddy Waters,blues,intense,0.70,78,0.44,0.55,0.65
+34,Born Under a Bad Sign,Albert King,blues,moody,0.60,80,0.46,0.50,0.68
+35,Pride and Joy,Stevie Ray Vaughan,blues,happy,0.75,120,0.78,0.68,0.55
+36,Cross Road Blues,Robert Johnson,blues,intense,0.68,96,0.42,0.52,0.90
+37,Stormy Monday,T-Bone Walker,blues,moody,0.45,65,0.35,0.40,0.75
+38,I'd Rather Go Blind,Etta James,blues,moody,0.38,58,0.32,0.35,0.72
+39,Red House,Jimi Hendrix,blues,intense,0.72,76,0.40,0.55,0.60
+40,Shake Your Money Maker,Elmore James,blues,happy,0.66,110,0.72,0.65,0.80
+41,HUMBLE.,Kendrick Lamar,rap,intense,0.88,150,0.43,0.72,0.06
+42,God's Plan,Drake,rap,happy,0.78,110,0.76,0.75,0.10
+43,Sicko Mode,Travis Scott,rap,intense,0.92,155,0.38,0.68,0.04
+44,Old Town Road,Lil Nas X,rap,happy,0.73,136,0.76,0.70,0.18
+45,Alright,Kendrick Lamar,rap,moody,0.65,95,0.50,0.62,0.08

@@ -58,6 +58,36 @@ def main() -> None:
     "target_tempo": 140,
 }
         ),
+        (
+            # This profile demonstrates the binary genre limitation.
+            # The mood, energy, tempo, and acousticness all fit blues songs
+            # closely — but because the genre is set to "jazz", every blues
+            # song in the catalog scores 0.0 on genre and gets pushed down,
+            # even though jazz and blues share deep musical roots.
+            "Jazz Purist (Blues-Compatible Taste)",
+            {
+                "favorite_genre": "jazz",
+                "favorite_mood": "moody",
+                "target_energy": 0.50,
+                "likes_acoustic": True,
+                "target_tempo": 75,
+            },
+        ),
+        (
+            # This profile demonstrates the same binary genre limitation for
+            # rap vs hip-hop. The mood, energy, tempo, and acousticness all
+            # fit rap songs closely — but because the genre is set to
+            # "hip-hop", every rap song scores 0.0 on genre and gets buried,
+            # even though rap is effectively a subgenre of hip-hop.
+            "Hip-Hop Head (Rap-Compatible Taste)",
+            {
+                "favorite_genre": "hip-hop",
+                "favorite_mood": "intense",
+                "target_energy": 0.90,
+                "likes_acoustic": False,
+                "target_tempo": 145,
+            },
+        ),
     ]
 
     for profile_name, user_prefs in profiles:

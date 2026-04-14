@@ -1,15 +1,27 @@
-# Byte compiled
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *.pyo
+*.pyd
 
 # Virtual environments
-.venv/
-env/
 venv/
+.env/
+.env.bak/
 
-# OS files
+# Environment variables
+*.env
+.env
+
+# macOS artifacts
 .DS_Store
 
-# Pytest cache
-.pytest_cache/
+# Cache directories
+.cache/
+*.cache/
+
+# VS Code
+.vscode/
+
+# Logs
+*.log

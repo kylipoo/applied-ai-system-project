@@ -1,161 +1,67 @@
-# 🎵 Music Recommender Simulation
+# Music Recommender Simulation
 
 ## Project Summary
 
-In this project you will build and explain a small music recommender system.
+This project is a music recommendation system that takes a user preference profile and scores every song in a catalog against it, returning the top-k best matches. The user specifies five preferences: favorite genre, favorite mood, target energy level (0–1), target tempo in BPM, and whether they prefer acoustic-sounding music. Each song in the catalog is then evaluated against those preferences using a weighted scoring formula across those same five features, producing a score between 0.0 and 1.0. The songs with the highest scores are returned as recommendations, along with a plain-text explanation of why each one was selected.
 
-Your goal is to:
+The scoring weights are:
 
-- Represent songs and a user "taste profile" as data
-- Design a scoring rule that turns that data into recommendations
-- Evaluate what your system gets right and wrong
-- Reflect on how this mirrors real world AI recommenders
+| Feature          | Weight |
+| ---------------- | ------ |
+| Genre match      | 40%    |
+| Mood match       | 25%    |
+| Energy proximity | 20%    |
+| Tempo proximity  | 10%    |
+| Acousticness fit | 5%     |
 
-Replace this paragraph with your own summary of what your version does.
+Genre and mood are evaluated as exact binary matches — a song either matches or it doesn't. Energy, tempo, and acousticness use linear proximity, so songs that are close to the user's target still score well rather than dropping to zero.
 
----
-
-## How The System Works
-
-Explain your design in plain language.
-
-Some prompts to answer:
-
-- What features does each `Song` use in your system
-  - For example: genre, mood, energy, tempo
-- What information does your `UserProfile` store
-- How does your `Recommender` compute a score for each song
-- How do you choose which songs to recommend
-
-You can include a simple diagram or bullet list if helpful.
+The catalog currently contains 27 songs across genres including pop, rock, lo-fi, jazz, hip-hop, synthwave, ambient, latin, funk, grunge, reggae, and classical.
 
 ---
 
-### Context:
+## Current Limitations
 
-- First, some context on how irl streaming platforms predict what users will listen to next. They have two methods: Collaborative filtering, content-based filtering.
-  - Collaborative filtering: If two users have similar taste histories, what one enjoys is a good prediction for the other.
-    - Build a user-item matrix (rows = each user, columns = songs, values = plays/ratings).
-    - Find users with similar behavior patterns (cosine similarity, matrix factorization).
-    - Recommend said items that similar users liked.
-    - Strengths: Discover surprising recommendations across genres.
-    - Weaknesses: Cold start problem (new users/items have no history), popularity bias towards mainstream content.
-  - Content-based filtering: Because a user liked a song with certain attributes, find items with similar attributes.
-    - Extract features from items (tempo, key, danceability, genre, etc)/
-    - Build profile of what user has engaged with.
-    - Recommend items with high feature similarity to that profile.
-    - Strengths: Work for new items immediately, explainable ("Because you liked this upbeat pop..."), no need for other users' data.
-    - Weaknesses: Over-specialization, can't discover genuinely new content.
+The system works well for users with clear, consistent preferences that align with what is well-represented in the catalog. However, several limitations become apparent under closer examination:
 
-### My Planned System:
+**Binary genre and mood matching.** Genre and mood are treated as exact labels. A jazz song scores 0.0 on genre for a user who wants blues, even though the two genres share harmonic roots and would feel similar to most listeners. A song labeled "moody" scores 0.0 for a user who wants "relaxed," even if the two are closer in feel than "moody" and "intense." There is no concept of genre proximity or mood similarity — only exact matches. This is problematic for users trying to branch out, as it means they'll be stuck with a specific genre when stuff like Blues was inspired by Jazz and Rap being a subgenre of Hip-hop.
 
-- Each Song is scored using five features: genre, mood, energy, tempo, and acousticness.
-- The UserProfile stores a matching set of preferences: favorite_genre, favorite_mood, target_energy, target_tempo (added after listening to criticism from inline agent), and likes_acoustic.
-  - The sample profile used for testing: genre = pop, mood = happy, target energy = 0.85, target tempo = 120 BPM, likes_acoustic = False.
-- Scoring runs each song through score_song(), which computes a weighted sum capped at 1.0 (represents a percentage of how close it matches the desired result):
-  - 0.40 × genre_score + 0.25 × mood_score + 0.20 × energy_score + 0.10 × tempo_score + 0.05 × acoustic_score
-  - Genre and mood are binary matches (1.0 or 0.0). Energy and tempo use proximity to the user's target value. Acousticness applies a soft penalty if the user dislikes acoustic songs.
-  - Tempo score and acoustic score will need some additional calculation to convert in terms of percentage match.
-  - All songs are scored, sorted descending, and the top k are returned.
-- This is content-based filtering — recommendations are derived entirely from song attributes matched against a single user's preferences, with no data from other users involved.
-  - The trade-off is explainability and privacy at the cost of serendipity. That being said, given that we are composing a service similar to spotify and youtube, that doesn't necessarily mean the user is completely blocked off from expanding their scope to other genres, they can always search for themselves.
-- **Potential Biases**:
-  - Genre can be a finnicky filter to assign a high weight to. The idea though was that oftentimes people will assign certain vibes just based on genre, like rock and roll would be fast and encourage defiance, pop would be talking about daily life experiences.
-    - A song in the wrong genre can never outscore a mediocre same-genre song, even if the other attributes are a perfect match.
-  - Data has 6 pop songs and 6 happy songs out of 17 total.
-  - Mood matching is either "fits the mood or doesn't".
-- **Diagram**:
-  - ![alt text](<Screenshot 2026-04-02 at 2.11.38 PM.jpg>)
+- I tried a profile where the user's preferred genre is Jazz yet the other attributes often align strongly with the blues sample data. The screenshot shows the score matches:
+  - ![alt text](<Screenshot 2026-04-14 at 3.20.12 PM.jpg>)
+- I tried another profile where the user likes the hip-hop genre, but the other attributes align with the rap sample data. The screenshot shows the score matches:
+  - ![alt text](<Screenshot 2026-04-14 at 3.30.15 PM.jpg>)
 
-## Getting Started
+**No semantic understanding of songs.** Two songs can score identically across all five numeric features and yet feel completely different. A 140 BPM rock song written as a victory anthem and one written as a descent into chaos look the same to this system. The numeric features describe the surface of a song, not what it actually means or how it actually feels.
 
-### Setup
+**Conflicting profiles produce degraded results.** A user profile that is internally contradictory — such as wanting lo-fi genre but high energy and intense mood — will consistently score 0.0 on mood, since lo-fi songs in the catalog are labeled as chill or focused. The system has no fallback and no way to recognize that the profile itself is in tension.
 
-1. Create a virtual environment (optional but recommended):
+**Sparse genres get poor results.** Genres like reggae, classical, and ambient are underrepresented in the catalog. A user with preferences in those areas will receive recommendations based on secondary features rather than genuine genre matches.
 
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate      # Mac or Linux
-   .venv\Scripts\activate         # Windows
-
-   ```
-
-2. Install dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-3. Run the app:
-
-```bash
-python -m src.main
-```
-
-### Running Tests
-
-Run the starter tests with:
-
-```bash
-pytest
-```
-
-You can add more tests in `tests/test_recommender.py`.
+**Template-based explanations are mechanical.** The explanation for every recommendation follows the same rigid structure: it lists which attributes matched or didn't. It cannot say anything nuanced about why a song actually fits — only that the numbers aligned.
 
 ---
 
-## Experiments You Tried
+## Planned Enhancements: RAG Integration
 
-Use this section to document the experiments you ran. For example:
+To address these limitations, the next version of this system will incorporate Retrieval-Augmented Generation (RAG). Rather than relying solely on numeric scoring, the system will retrieve relevant text-based context about songs and genres, and use a language model to reason over that context alongside the numeric scores. Three specific features are planned:
 
-- What happened when you changed the weight on genre from 2.0 to 0.5
-- What happened when you added tempo or valence to the score
-- How did your system behave for different types of users
+### 1. Genre Relationship Retrieval
 
----
+A small knowledge base will be built that describes the relationships between genres — which genres share origins, which overlap in sound, and how closely related they are. When a user requests a genre, the system will retrieve context about that genre and its neighbors, and use it to apply partial credit instead of a binary match. For example, a blues song would score meaningfully higher than 0.0 for a user who wants jazz, because the retrieval step would surface the shared harmonic vocabulary between the two. This directly fixes the hardest limitation of the current scoring model.
 
-- My system returned different song recommendations depending on the user profile's preferences. This has the explanation of checking first and foremost if the genre and the mood changed, as they are the highest weighed elements of the recipe.
-- When I tried a user profile that had conflicting attributes (Lo-fi rager), the results returned were very low-scored, since genre is presently a 1 or nothing score, yet at the same time the target energy of that profile doesn't match any of the Lo-fi results.
-  - HOWEVER, when I tried a different formula where the energy was given more weight (doubled from 0.2 to 0.4), the same results were scored higher because energy is a more numeric attribute instead of a binary 1 or 0 to see if it matches exactly.
-- I added target tempo, which gave a more precise means of distinguishing profiles like intense rock or chill lofi.
+This also improves handling of conflicting preference profiles through conflict detection and dual retrieval. When a profile is submitted, the RAG layer retrieves genre context from the knowledge base — for example, looking up "lo-fi" surfaces context like _"lo-fi: characterized by chill, low-stimulation sound, commonly used for studying."_ The LLM then checks that against the requested mood and flags a conflict if the two are incompatible.
 
-## Limitations and Risks
+When a conflict is detected, the system runs two passes through the existing scoring instead of one:
 
-Summarize some limitations of your recommender.
+- **Pass 1** — prioritize genre match, return the top lo-fi songs
+- **Pass 2** — prioritize mood match, return the top intense songs
 
-Examples:
+The results are merged into the final k slots (for example, 3 lo-fi + 2 intense for k=5), and the explanation clearly communicates the split: _"Your profile requested lo-fi with intense mood — these are in tension, so your recommendations are split. The first group matches your genre preference; the second matches your intensity preference."_ The numeric scoring system itself remains unchanged throughout — RAG handles detection, retrieval, and explanation on top of it.
 
-- It only works on a tiny catalog
-- It does not understand lyrics or language
-- It might over favor one genre or mood
+### 2. Per-Song Context Blurbs
 
-You will go deeper on this in your model card.
+Each song in the catalog will be given a short text description capturing things the numeric features cannot: the emotional context of the song, what it's commonly associated with, its cultural background, and what kind of listening moment it fits. When two songs score similarly on numeric features, the system will retrieve their blurbs and use them to distinguish between songs that are numerically identical but emotionally different — the gap identified in the current limitations.
 
----
+### 3. RAG-Powered Explanation Generation
 
-- Limitations encountered during planning:
-  - I had run my original user profile with inline chat and they had a criticism that "intense rock" and "chill lofi" were differentiated for the wrong reasons (through target energy, not because it understood "intense" and "chill" as moods).
-  - Mood is considered binary matching, a favorite mood of "happy" will consider both "intense" and "chill" as 0 equally.
-  - Genre is too narrow. With "pop" as a target, a high-energy rock track would score worse than a mid-energy pop track. Just because the genre is different doesn't mean the user wouldn't have liked the "rock" example.
-  - No tempo signal. Stuff like intense rock and chill lofi would be most cleanly separated by tempo (152 bpm and 72 bpm respectively).
-  - Now I have refined profile to have target_tempo. It can now distinguish "high energy + fast tempo" from "high energy + slow tempo" and avoids the issue where energy alone conflates different types of intensity.
-
-## Reflection
-
-Read and complete `model_card.md`:
-
-[**Model Card**](model_card.md)
-
-Write 1 to 2 paragraphs here about what you learned:
-
-- about how recommenders turn data into predictions
-- about where bias or unfairness could show up in systems like this
-
----
-
-- Building this recommender showed me that turning data into predictions is really about encoding assumptions and discerning patterns. Every weight in score_song is a judgement call: The system scores songs by weighing numeric attributes such as energy or tempo against a user's stated preferences, then ranks by closeness. That sounds objective, but then the weights are the deciding factor in what "close enough" means. Doubling the energy from 0.2->0.4 completely changed song scores and which ones surfaced, even for users where said genre was top priority. The prediction isn't from the data, it's from choices basked into the formula.
-- The bias risk follows directly from that. If the catalog underrepresents certain genres or moods, users with those preferences get worse results through no fault of the algorithm — it's just working with incomplete data. The "Lofi Rager" profile in the code is a clear example: a user who wants intense, high-energy lofi gets broken recommendations because that niche doesn't exist in the dataset. In a real product, that pattern would fall hardest on listeners with niche or non-mainstream tastes, while users who prefer well-catalogued genres like pop consistently get better results. The system appears fair because it applies the same formula to everyone, but equal treatment of unequal data still produces unequal outcomes.
-
-## 7. `model_card_template.md`
-
-#### Refer to the modelcard.md file.
+Instead of the current template-based explanations, the top-k recommendations will be passed to a language model along with the song blurbs and the user's stated preferences. The model will generate natural, context-aware explanations for each recommendation — explaining not just that the numbers matched, but why this song actually fits what the user is looking for, in terms a listener would recognize.
