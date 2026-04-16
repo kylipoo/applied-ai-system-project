@@ -38,12 +38,40 @@ class Recommender:
         self.songs = songs
 
     def recommend(self, user: UserProfile, k: int = 5) -> List[Song]:
-        # TODO: Implement recommendation logic
-        return self.songs[:k]
+        user_dict = {
+            "favorite_genre": user.favorite_genre,
+            "favorite_mood": user.favorite_mood,
+            "target_energy": user.target_energy,
+            "target_tempo": 120,
+            "likes_acoustic": user.likes_acoustic,
+        }
+        scored = [
+            (song, score_song(self._song_to_dict(song), user_dict)[0])
+            for song in self.songs
+        ]
+        scored.sort(key=lambda x: x[1], reverse=True)
+        return [song for song, _ in scored[:k]]
 
     def explain_recommendation(self, user: UserProfile, song: Song) -> str:
-        # TODO: Implement explanation logic
-        return "Explanation placeholder"
+        user_dict = {
+            "favorite_genre": user.favorite_genre,
+            "favorite_mood": user.favorite_mood,
+            "target_energy": user.target_energy,
+            "target_tempo": 120,
+            "likes_acoustic": user.likes_acoustic,
+        }
+        _, explanation = score_song(self._song_to_dict(song), user_dict)
+        return explanation
+
+    @staticmethod
+    def _song_to_dict(song: Song) -> dict:
+        return {
+            "genre": song.genre,
+            "mood": song.mood,
+            "energy": song.energy,
+            "tempo_bpm": song.tempo_bpm,
+            "acousticness": song.acousticness,
+        }
 
 def load_songs(csv_path: str) -> List[Dict]:
     """
@@ -63,19 +91,34 @@ def load_songs(csv_path: str) -> List[Dict]:
             songs.append(row)
     return songs
 
-def score_song(song: Dict, user_prefs: Dict) -> Tuple[float, str]:
+def score_song(song: Dict, user_prefs: Dict, subgenre_map: Dict = None) -> Tuple[float, str]:
     """
     Scores a single song against user preferences.
     Returns (score, explanation) where score is in [0.0, 1.0].
 
     Weights:
-      0.40 genre match (binary)
+      0.40 genre match (1.0 exact, 0.7 subgenre via AI-generated map, 0.0 none)
       0.25 mood match  (binary)
       0.20 energy proximity
       0.10 tempo proximity
       0.05 acousticness fit
     """
-    genre_score = 1.0 if song["genre"] == user_prefs["favorite_genre"] else 0.0
+    song_genre = song["genre"]
+    pref_genre = user_prefs["favorite_genre"]
+
+    if song_genre == pref_genre:
+        genre_score = 1.0
+        genre_label = "exact"
+    elif subgenre_map and (
+        song_genre in subgenre_map.get(pref_genre, []) or
+        pref_genre in subgenre_map.get(song_genre, [])
+    ):
+        genre_score = 0.7
+        genre_label = "subgenre"
+    else:
+        genre_score = 0.0
+        genre_label = "none"
+
     mood_score  = 1.0 if song["mood"]  == user_prefs["favorite_mood"]  else 0.0
 
 # These scores are converted in such a way that can be scaled [0, 1]
@@ -111,8 +154,10 @@ def score_song(song: Dict, user_prefs: Dict) -> Tuple[float, str]:
 
     reasons = []
 
-    if genre_score == 1.0:
+    if genre_label == "exact":
         reasons.append(f"genre matches ({song['genre']})")
+    elif genre_label == "subgenre":
+        reasons.append(f"genre is closely related ({song['genre']} is related to {user_prefs['favorite_genre']})")
     else:
         reasons.append(f"genre doesn't match (it's {song['genre']}, you want {user_prefs['favorite_genre']})")
 
@@ -142,11 +187,11 @@ def score_song(song: Dict, user_prefs: Dict) -> Tuple[float, str]:
     return round(score, 4), explanation
 
 
-def recommend_songs(user_prefs: Dict, songs: List[Dict], k: int = 5) -> List[Tuple[Dict, float, str]]:
+def recommend_songs(user_prefs: Dict, songs: List[Dict], k: int = 5, subgenre_map: Dict = None) -> List[Tuple[Dict, float, str]]:
     """
     Functional implementation of the recommendation logic.
     Required by src/main.py
     """
-    scored = [(song, *score_song(song, user_prefs)) for song in songs]
+    scored = [(song, *score_song(song, user_prefs, subgenre_map)) for song in songs]
     scored.sort(key=lambda x: x[1], reverse=True)
     return scored[:k]
