@@ -154,18 +154,49 @@ Examples:
 - I would add more diverse genres and balance the current selection out.
 - I would add more attributes like what kind of instruments are being used, the volume, if the song contains any mature themes.
 - I actually plan on making this project the subject of the final project where I need to implement RAG.
-  - A meaningful extension would be to augment the numeric scoring with a RAG layer that retrieves text-based context about each song — artist interviews, critical reviews, lyric analysis, or cultural background — and uses a language model to reason over that context alongside the numeric match. This would let the system distinguish songs that are numerically identical but emotionally different, and surface recommendations based on meaning rather than just measurement. For example, two songs at 140 BPM with energy 0.92 might score identically today, but one was written as a celebration another as a breakdown. This is based on personal experience, I saw a video once pointing out two songs had the same key (tonal center/musical scale) yet one of them was from the Minecraft movie and was light hearted and talking about lava chicken, the other was from death note and it was meant to display the crashout and mental decay of the protagonist.
+  - Map genres to any subgenres, would also involve modifying the algorithmic recipe.
+  - A very ambitious potential extension would be to augment the numeric scoring with a RAG layer that retrieves text-based context about each song — artist interviews, critical reviews, lyric analysis, or cultural background — and uses a language model to reason over that context alongside the numeric match. This would let the system distinguish songs that are numerically identical but emotionally different, and surface recommendations based on meaning rather than just measurement. For example, two songs at 140 BPM with energy 0.92 might score identically today, but one was written as a celebration another as a breakdown. This is based on personal experience, I saw a video once pointing out two songs had the same key (tonal center/musical scale) yet one of them was from the Minecraft movie and was light hearted and talking about lava chicken, the other was from death note and it was meant to display the crashout and mental decay of the protagonist.
+  -
 
-## 9. Personal Reflection
+## Reflection
 
-A few sentences about what you learned:
+The biggest shift in how I think about AI after this project: **the LLM is most useful where the rules are impossible to enumerate.** I spent the v1 version trying to list every genre relationship and gave up — there are too many and they're too fuzzy. One API call that returns `{"jazz": ["blues"], ...}` solved in seconds what a hand-written mapping couldn't.
 
-- What surprised you about how your system behaved
-- How did building this change how you think about real music recommenders
-- Where do you think human judgment still matters, even if the model seems "smart"
+At the same time, the places where I let the model take over the most are the places I had to add the most guardrails. Gemma will invent songs if you let it, misread decimals, and drift from the task if the conversation gets long. Every "smart" behavior I added to the agent came with a corresponding safety net (the guardrail regex, the confirm-preferences step, the JSON schema validation). The project ended up being as much about bounding the model as about using it.
 
-I was surprised that even features most don't think about when they listen to a song, like tempo can be important, as that was one of the recommendations Claude gave to make song scoring more accurate.
+### How I Used AI During Development
 
-Building this system showed me that every weight shift has cascading consequences on the entire ranking. When I doubled the energy weight from 0.20 to 0.40, songs that were buried suddenly surfaced — not because they became better matches, but because I changed what the system was willing to prioritize. Those decisions look like math, but they're not neutral. And even when the weights feel right, scoring alone doesn't tell the full picture: genre is treated as a binary label, so if you asked for "heavy metal," every rock song in the catalog would score a 0 on genre — even though most listeners would instinctively know the two are closely related. The system has no concept of proximity between categories, only exact matches.
+I used AI in three concrete modes across this project:
 
-That drift points to where human judgment stays irreplaceable. A score can tell you two songs share the same energy and BPM, but it can't tell you one feels like a rainy afternoon, or that the other is the song from a video game that defined someone's childhood. Numbers describe a song's surface; what makes a song matter lives somewhere no feature vector can reach.
+- **Design.** The overall RAG architecture was brainstormed in chat before any code was written — the idea of building the subgenre map at runtime rather than hard-coding it, the decision to keep the deterministic scorer under the LLM instead of replacing it, and the guardrail strategy (input validation + role priming + hallucination regex) all came out of those design conversations.
+- **Code generation.** Scaffolding for the agent chat loop, the Wikipedia retrieval function, the RAG prompt structure, and the JSON-extraction regex were all AI-generated starting points that I then edited and patched against real failure cases.
+- **Model selection.** When I hit request limits on one model mid-development, I asked chat for guidance on alternatives and pivoted to Gemma as the final choice. That unblocking conversation is the reason `gemma-3-27b-it` is the model in [src/llm_client.py:12](src/llm_client.py#L12).
+
+### Helpful AI Suggestion: Catalog Guardrails
+
+An AI suggestion that was helpful was adding guardrails around what data the agent was free to reference.
+
+- Prior to adding guardrails, the music recommender agent would output information not fed in by the dataset. For example, when I was looking for high energy pop, the AI response hallucinated artists and worst case scenario, songs not even in my csv file.
+  - ![alt text](<Screenshot 2026-04-21 at 2.49.42 PM.jpg>) (The artists Dua Lipa, Harry Styles, Lizzo, etc are not in my csv file).
+- Here is an example of a helpful recommendation. It's the same original prompt of high energy prompt but after I've added guardrails. There's less hallucinated information, all songs I checked are in the dataset.
+  - ![alt text](<Screenshot 2026-04-21 at 2.57.48 PM.jpg>)
+
+### Flawed AI Suggestion: Wikipedia-First Retrieval
+
+When I was designing the RAG layer, AI proposed a clean Wikipedia-backed retrieval format that assumed every song in the catalog would have a dedicated Wikipedia article — one `wikipedia.page(title)` call returns the summary, done. In practice this broke in two places:
+
+1. **Fictional catalog entries.** Roughly half the catalog is lesser known tracks (Sunrise City, Library Rain, Focus Flow). These have no Wikipedia page at all, so the call just errored out.
+2. **Disambiguation pages.** Even for real songs, a title often maps to multiple articles (film, album, unrelated song). The naive retrieval returned malformed responses or the wrong article entirely when Wikipedia served a disambiguation page.
+
+I had to patch the retrieval in two places: the `is_song_page` filter at [agent.py:40-42](src/agent.py#L40) that checks summary text for phrases like "is a song", "single by", or "recorded by" before accepting a result, and the `DisambiguationError` handler at [agent.py:52-59](src/agent.py#L52) that walks the disambiguation options and picks the one labeled "song." The lesson: when AI suggests pulling from an external knowledge source, it tends to assume the source is complete and unambiguous. Neither is usually true.
+
+### System Limitations and Future Improvements
+
+What the RAG layer didn't fix, and what's next:
+
+- **Binary mood matching.** The subgenre map fixed binary _genre_ matching but mood is still 1.0 or 0.0 — "moody" vs "relaxed" scores zero even though they're close. **Fix:** apply the same startup LLM call pattern to build a mood-relationship map.
+- **Conflicting profiles still produce mediocre results.** A user asking for lofi + intense still gets a low-scoring compromise. **Fix:** implement the "dual-pass retrieval" I promised in v1 — split the top-k between the two conflicting preferences and explain the split.
+- **Wikipedia gaps on fictional catalog entries.** The RAG explanation degrades to attribute-only for the made-up songs, losing its best hook. **Fix:** hand-write (or AI-generate once and cache) a short blurb per song so every track has context regardless of Wikipedia coverage, or if I were to really take the recommender to another level, have it call another agent specifically assigned to looking up information on the song.
+- **RAG explanations aren't mechanically verified.** The "do not invent" instruction is prompt-only — if Gemma hallucinates, nothing catches it. **Fix:** add a self-critique pass where a second model call checks whether each claim in the explanation appears in the provided snippets, and rejects the explanation if not.
+
+Problem-solving-wise, the lesson was to weigh my original work with that of AI's suggestions, determine what had to go, what would be neat to add. The v1 numeric scorer was transparent and correct for the cases it could handle. My first instinct was to replace it; my final design treats it as the foundation and uses the LLM to patch only the specific failure mode — binary genre matching — that the scorer couldn't solve on its own. Adding capability without removing legibility turned out to be the actual design problem.

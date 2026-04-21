@@ -163,6 +163,31 @@ Without it, Gemma will happily invent songs that aren't in the catalog. The `^\s
 
 ---
 
+## Reliability
+
+The system has four reliability mechanisms layered across input, output, and evaluation — the rubric asks for one, the codebase has several:
+
+**Input validation.**
+
+- [`extract_recommend_json`](src/agent.py#L86) rejects any `RECOMMEND:` block missing one of the five required preference keys (`favorite_genre`, `favorite_mood`, `target_energy`, `target_tempo`, `likes_acoustic`). A half-parsed JSON blob never reaches the scorer — it just falls through as "no recommendation yet" and the conversation continues.
+- The **confirm-before-search** step at [agent.py:203-209](src/agent.py#L203) echoes captured preferences back to the user before `recommend_songs` runs. This catches mis-parsed decimals (e.g. `0.9` → `9`) and lets the user correct Gemma mid-conversation instead of silently getting bad matches.
+
+**Output guardrails.**
+
+- The **hallucinated-songs guardrail** at [agent.py:176-187](src/agent.py#L176) uses the regex `^\s*\d+\.` to detect numbered lists in Gemma's reply and re-prompts the model to emit a `RECOMMEND:` block instead. Without this, Gemma will happily invent songs that aren't in the catalog; with it, the only songs a user ever sees are ones that came out of the deterministic scorer.
+- The **Wikipedia disambiguation filter** [`is_song_page`](src/agent.py#L40) checks retrieved page summaries for phrases like `"is a song"`, `"single by"`, or `"recorded by"` before accepting them. This prevents film pages, album pages, or unrelated disambiguation drift from leaking into the RAG explanation — the RAG layer degrades to "no Wikipedia context" rather than explaining the song with irrelevant text.
+- The RAG prompt in [llm_client.py:39-49](src/llm_client.py#L39) explicitly instructs the model to **"not invent any information not present in the snippets,"** grounding every generated explanation in the song attributes and (optional) Wikipedia summary that were actually retrieved.
+- **Input validation**: The system prompt at [agent.py:131-152](src/agent.py#L131) frames Gemma as "a friendly music recommendation assistant" whose job is narrowly defined as recommending songs from the catalog. This role-framing means off-topic questions get deflected back to the task rather than answered. In the example screenshot below, I asked the AI agent "how do I bake a cake?" and rather than go off topic, it re-iterated its question of what song attributes I wanted. I was inspired to add this feature after I learned how some people would abuse customer support agents to help them with math problems instead of inquiring about a product or doing anything the agent was meant to actually do.
+  - ![alt text](<Screenshot 2026-04-21 at 2.16.01 PM.jpg>)
+  - The next screenshot shows an example of a correct query. It has 5 parameters, and matches any of the available keywords/has the right typing.
+    - ![alt text](<Screenshot 2026-04-21 at 2.23.34 PM.jpg>)
+
+**Evaluation script.**
+
+- [src/main.py](src/main.py) runs the deterministic scorer across six contrasting user profiles — High-Energy Pop, Chill Lofi, Deep Intense Rock, Lofi Rager, Jazz Purist (Blues-Compatible), and Hip-Hop Head (Rap-Compatible) — and prints the top-5 ranked output for each. The last two profiles specifically exercise the subgenre-map code path, so running `python src/main.py` is effectively a regression check that related genres still get partial credit.
+
+---
+
 ## Testing Summary
 
 **What's automated.** [tests/test_recommender.py](tests/test_recommender.py) covers the core scoring contract with two tests: that `recommend()` returns songs sorted by score, and that `explain_recommendation()` returns a non-empty string. These run against the OOP `Recommender`/`UserProfile`/`Song` dataclasses and pass on the current implementation.
@@ -189,8 +214,41 @@ Without it, Gemma will happily invent songs that aren't in the catalog. The `^\s
 
 The biggest shift in how I think about AI after this project: **the LLM is most useful where the rules are impossible to enumerate.** I spent the v1 version trying to list every genre relationship and gave up — there are too many and they're too fuzzy. One API call that returns `{"jazz": ["blues"], ...}` solved in seconds what a hand-written mapping couldn't.
 
-At the same time, the places where I let the model take over the most are the places I had to add the most guardrails. Gemma will invent songs if you let it. It will misread decimals. It will drift from the task if the conversation gets long. Every "smart" behavior I added to the agent came with a corresponding safety net (the guardrail regex, the confirm-preferences step, the JSON schema validation). The project ended up being as much about bounding the model as about using it.
+At the same time, the places where I let the model take over the most are the places I had to add the most guardrails. Gemma will invent songs if you let it, misread decimals, and drift from the task if the conversation gets long. Every "smart" behavior I added to the agent came with a corresponding safety net (the guardrail regex, the confirm-preferences step, the JSON schema validation). The project ended up being as much about bounding the model as about using it.
 
-Problem-solving-wise, the lesson was to preserve what already works before adding AI on top. The v1 numeric scorer was transparent and correct for the cases it could handle. My first instinct was to replace it; my final design treats it as the foundation and uses the LLM to patch only the specific failure mode — binary genre matching — that the scorer couldn't solve on its own. Adding capability without removing legibility turned out to be the actual design problem.
+### How I Used AI During Development
 
-Where human judgment still matters: a score can tell you two songs share the same energy and tempo, but it can't tell you one is from a video game that defined someone's childhood. The RAG layer narrows the gap — a Wikipedia blurb at least gives the model _something_ to reason about — but it doesn't close it. Numbers describe a song's surface; what makes a song matter still lives somewhere no feature vector can reach.
+I used AI in three concrete modes across this project:
+
+- **Design.** The overall RAG architecture was brainstormed in chat before any code was written — the idea of building the subgenre map at runtime rather than hard-coding it, the decision to keep the deterministic scorer under the LLM instead of replacing it, and the guardrail strategy (input validation + role priming + hallucination regex) all came out of those design conversations.
+- **Code generation.** Scaffolding for the agent chat loop, the Wikipedia retrieval function, the RAG prompt structure, and the JSON-extraction regex were all AI-generated starting points that I then edited and patched against real failure cases.
+- **Model selection.** When I hit request limits on one model mid-development, I asked chat for guidance on alternatives and pivoted to Gemma as the final choice. That unblocking conversation is the reason `gemma-3-27b-it` is the model in [src/llm_client.py:12](src/llm_client.py#L12).
+
+### Helpful AI Suggestion: Catalog Guardrails
+
+An AI suggestion that was helpful was adding guardrails around what data the agent was free to reference.
+
+- Prior to adding guardrails, the music recommender agent would output information not fed in by the dataset. For example, when I was looking for high energy pop, the AI response hallucinated artists and worst case scenario, songs not even in my csv file.
+  - ![alt text](<Screenshot 2026-04-21 at 2.49.42 PM.jpg>) (The artists Dua Lipa, Harry Styles, Lizzo, etc are not in my csv file).
+- Here is an example of a helpful recommendation. It's the same original prompt of high energy prompt but after I've added guardrails. There's less hallucinated information, all songs I checked are in the dataset.
+  - ![alt text](<Screenshot 2026-04-21 at 2.57.48 PM.jpg>)
+
+### Flawed AI Suggestion: Wikipedia-First Retrieval
+
+When I was designing the RAG layer, AI proposed a clean Wikipedia-backed retrieval format that assumed every song in the catalog would have a dedicated Wikipedia article — one `wikipedia.page(title)` call returns the summary, done. In practice this broke in two places:
+
+1. **Fictional catalog entries.** Roughly half the catalog is lesser known tracks (Sunrise City, Library Rain, Focus Flow). These have no Wikipedia page at all, so the call just errored out.
+2. **Disambiguation pages.** Even for real songs, a title often maps to multiple articles (film, album, unrelated song). The naive retrieval returned malformed responses or the wrong article entirely when Wikipedia served a disambiguation page.
+
+I had to patch the retrieval in two places: the `is_song_page` filter at [agent.py:40-42](src/agent.py#L40) that checks summary text for phrases like "is a song", "single by", or "recorded by" before accepting a result, and the `DisambiguationError` handler at [agent.py:52-59](src/agent.py#L52) that walks the disambiguation options and picks the one labeled "song." The lesson: when AI suggests pulling from an external knowledge source, it tends to assume the source is complete and unambiguous. Neither is usually true.
+
+### System Limitations and Future Improvements
+
+What the RAG layer didn't fix, and what's next:
+
+- **Binary mood matching.** The subgenre map fixed binary _genre_ matching but mood is still 1.0 or 0.0 — "moody" vs "relaxed" scores zero even though they're close. **Fix:** apply the same startup LLM call pattern to build a mood-relationship map.
+- **Conflicting profiles still produce mediocre results.** A user asking for lofi + intense still gets a low-scoring compromise. **Fix:** implement the "dual-pass retrieval" I promised in v1 — split the top-k between the two conflicting preferences and explain the split.
+- **Wikipedia gaps on fictional catalog entries.** The RAG explanation degrades to attribute-only for the made-up songs, losing its best hook. **Fix:** hand-write (or AI-generate once and cache) a short blurb per song so every track has context regardless of Wikipedia coverage, or if I were to really take the recommender to another level, have it call another agent specifically assigned to looking up information on the song.
+- **RAG explanations aren't mechanically verified.** The "do not invent" instruction is prompt-only — if Gemma hallucinates, nothing catches it. **Fix:** add a self-critique pass where a second model call checks whether each claim in the explanation appears in the provided snippets, and rejects the explanation if not.
+
+Problem-solving-wise, the lesson was to weigh my original work with that of AI's suggestions, determine what had to go, what would be neat to add. The v1 numeric scorer was transparent and correct for the cases it could handle. My first instinct was to replace it; my final design treats it as the foundation and uses the LLM to patch only the specific failure mode — binary genre matching — that the scorer couldn't solve on its own. Adding capability without removing legibility turned out to be the actual design problem.
