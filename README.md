@@ -177,7 +177,7 @@ Without it, Gemma will happily invent songs that aren't in the catalog. The `^\s
 
 **What didn't.**
 
-- Wikipedia strikes out on obscure catalog tracks (`Sunrise City by Neon Echo`, `Library Rain by Paper Lanterns`) because those are fictional entries I added. The code degrades to a RAG-only explanation (no Wikipedia tag), which is acceptable but feels thinner.
+- Wikipedia strikes out on obscure catalog tracks (`Sunrise City by Neon Echo`, `Library Rain by Paper Lanterns`) because those are fictional entries I added. The code degrades to a RAG-only explanation (no Wikipedia tag), which is acceptable but feels thinner. My compromise was that when relevant, add examples of what album the song was in, or when they were played, to give them a sense of prestige/appeal.
 - Gemma occasionally ignores the "don't list songs yourself" rule on the first turn and has to be re-prompted by the guardrail. It's caught, but it's a round-trip of latency.
 - Conflicting profiles (lofi + intense) still produce mediocre results. The planned "dual-pass retrieval" from the v1 README isn't implemented — it's one of the things I'd build next.
 
