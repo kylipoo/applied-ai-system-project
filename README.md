@@ -1,67 +1,196 @@
-# Music Recommender Simulation
+# VibeCheck 3.6 — RAG-Augmented Music Recommender
 
-## Project Summary
+## Original Project (Modules 1–3)
 
-This project is a music recommendation system that takes a user preference profile and scores every song in a catalog against it, returning the top-k best matches. The user specifies five preferences: favorite genre, favorite mood, target energy level (0–1), target tempo in BPM, and whether they prefer acoustic-sounding music. Each song in the catalog is then evaluated against those preferences using a weighted scoring formula across those same five features, producing a score between 0.0 and 1.0. The songs with the highest scores are returned as recommendations, along with a plain-text explanation of why each one was selected.
+The base of this project is **VibeCheck 3.6**, a Music Recommender Simulation built in the earlier modules. It is a rule-based recommender that scores every song in a 27-song catalog against a five-field user preference profile (favorite genre, favorite mood, target energy 0–1, target tempo in BPM, and whether the user prefers acoustic-sounding music) and returns the top-k best matches with a template explanation.
 
-The scoring weights are:
-
-| Feature          | Weight |
-| ---------------- | ------ |
-| Genre match      | 40%    |
-| Mood match       | 25%    |
-| Energy proximity | 20%    |
-| Tempo proximity  | 10%    |
-| Acousticness fit | 5%     |
-
-Genre and mood are evaluated as exact binary matches — a song either matches or it doesn't. Energy, tempo, and acousticness use linear proximity, so songs that are close to the user's target still score well rather than dropping to zero.
-
-The catalog currently contains 27 songs across genres including pop, rock, lo-fi, jazz, hip-hop, synthwave, ambient, latin, funk, grunge, reggae, and classical.
+The original scoring uses a weighted formula — 40% genre, 25% mood, 20% energy, 10% tempo, 5% acousticness — where genre and mood are binary (exact match or zero) and energy, tempo, and acousticness use linear proximity. Its goal was to demonstrate transparent, traceable recommendation logic; every score can be broken down into its five components.
 
 ---
 
-## Current Limitations
+## Title and Summary
 
-The system works well for users with clear, consistent preferences that align with what is well-represented in the catalog. However, several limitations become apparent under closer examination:
+**VibeCheck 3.6** is a music recommender that now combines the original numeric scoring engine with a Retrieval-Augmented Generation (RAG) layer powered by Google's Gemma model. Instead of asking users to fill out a rigid preference form, a chat agent interviews the user in natural language, and every recommendation is explained with context pulled from the catalog and Wikipedia.
 
-**Binary genre and mood matching.** Genre and mood are treated as exact labels. A jazz song scores 0.0 on genre for a user who wants blues, even though the two genres share harmonic roots and would feel similar to most listeners. A song labeled "moody" scores 0.0 for a user who wants "relaxed," even if the two are closer in feel than "moody" and "intense." There is no concept of genre proximity or mood similarity — only exact matches. This is problematic for users trying to branch out, as it means they'll be stuck with a specific genre when stuff like Blues was inspired by Jazz and Rap being a subgenre of Hip-hop.
-
-- I tried a profile where the user's preferred genre is Jazz yet the other attributes often align strongly with the blues sample data. The screenshot shows the score matches:
-  - ![alt text](<Screenshot 2026-04-14 at 3.20.12 PM.jpg>)
-- I tried another profile where the user likes the hip-hop genre, but the other attributes align with the rap sample data. The screenshot shows the score matches:
-  - ![alt text](<Screenshot 2026-04-14 at 3.30.15 PM.jpg>)
-
-**No semantic understanding of songs.** Two songs can score identically across all five numeric features and yet feel completely different. A 140 BPM rock song written as a victory anthem and one written as a descent into chaos look the same to this system. The numeric features describe the surface of a song, not what it actually means or how it actually feels.
-
-**Conflicting profiles produce degraded results.** A user profile that is internally contradictory — such as wanting lo-fi genre but high energy and intense mood — will consistently score 0.0 on mood, since lo-fi songs in the catalog are labeled as chill or focused. The system has no fallback and no way to recognize that the profile itself is in tension.
-
-**Sparse genres get poor results.** Genres like reggae, classical, and ambient are underrepresented in the catalog. A user with preferences in those areas will receive recommendations based on secondary features rather than genuine genre matches.
-
-**Template-based explanations are mechanical.** The explanation for every recommendation follows the same rigid structure: it lists which attributes matched or didn't. It cannot say anything nuanced about why a song actually fits — only that the numbers aligned.
+This matters because the original v1 had a hard failure mode: binary genre matching meant that asking for "jazz" buried every blues song at 0.0, even though the two genres share harmonic roots. The RAG layer fixes that failure directly by letting an LLM decide what counts as a neighboring genre, while keeping the transparent numeric scoring intact underneath.
 
 ---
 
-## Planned Enhancements: RAG Integration
+## Architecture Overview
 
-To address these limitations, the next version of this system will incorporate Retrieval-Augmented Generation (RAG). Rather than relying solely on numeric scoring, the system will retrieve relevant text-based context about songs and genres, and use a language model to reason over that context alongside the numeric scores. Three specific features are planned:
+![alt text](<Screenshot 2026-04-20 at 7.18.32 PM.jpg>)
 
-### 1. Genre Relationship Retrieval
+Three components, three jobs:
 
-A small knowledge base will be built that describes the relationships between genres — which genres share origins, which overlap in sound, and how closely related they are. When a user requests a genre, the system will retrieve context about that genre and its neighbors, and use it to apply partial credit instead of a binary match. For example, a blues song would score meaningfully higher than 0.0 for a user who wants jazz, because the retrieval step would surface the shared harmonic vocabulary between the two. This directly fixes the hardest limitation of the current scoring model.
+1. **Agent ([src/agent.py](src/agent.py))** — a Gemma-powered chat loop that replaces the old hard-coded profile list. On startup it asks Gemma to build a **genre-relationship map** from the catalog's actual genres (e.g. `{"hip-hop": ["rap", "funk"], "jazz": ["blues"], ...}`) which is passed into the scorer so that related genres get 0.7 partial credit instead of 0.0.
+2. **Scorer ([src/recommender.py](src/recommender.py))** — the original numeric scoring formula, extended with one new branch: if an exact genre match fails, check the AI-generated subgenre map before falling back to 0.0.
+3. **RAG Explainer ([src/llm_client.py](src/llm_client.py))** — for each recommended song, Wikipedia is queried for a real-world summary, and Gemma generates a grounded 2–3 sentence explanation from the song attributes + user preferences + (optional) Wikipedia snippet.
 
-This also improves handling of conflicting preference profiles through conflict detection and dual retrieval. When a profile is submitted, the RAG layer retrieves genre context from the knowledge base — for example, looking up "lo-fi" surfaces context like _"lo-fi: characterized by chill, low-stimulation sound, commonly used for studying."_ The LLM then checks that against the requested mood and flags a conflict if the two are incompatible.
+---
 
-When a conflict is detected, the system runs two passes through the existing scoring instead of one:
+## Setup Instructions
 
-- **Pass 1** — prioritize genre match, return the top lo-fi songs
-- **Pass 2** — prioritize mood match, return the top intense songs
+1. **Clone the repo and enter the directory.**
 
-The results are merged into the final k slots (for example, 3 lo-fi + 2 intense for k=5), and the explanation clearly communicates the split: _"Your profile requested lo-fi with intense mood — these are in tension, so your recommendations are split. The first group matches your genre preference; the second matches your intensity preference."_ The numeric scoring system itself remains unchanged throughout — RAG handles detection, retrieval, and explanation on top of it.
+   ```bash
+   git clone <this-repo-url>
+   cd applied-ai-system-project
+   ```
 
-### 2. Per-Song Context Blurbs
+2. **Install dependencies.** The code also uses `google-generativeai` and `python-dotenv` at runtime:
 
-Each song in the catalog will be given a short text description capturing things the numeric features cannot: the emotional context of the song, what it's commonly associated with, its cultural background, and what kind of listening moment it fits. When two songs score similarly on numeric features, the system will retrieve their blurbs and use them to distinguish between songs that are numerically identical but emotionally different — the gap identified in the current limitations.
+   ```bash
+   pip install -r requirements.txt
+   pip install google-generativeai python-dotenv
+   ```
 
-### 3. RAG-Powered Explanation Generation
+3. **Get a Gemini API key** from [https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey).
 
-Instead of the current template-based explanations, the top-k recommendations will be passed to a language model along with the song blurbs and the user's stated preferences. The model will generate natural, context-aware explanations for each recommendation — explaining not just that the numbers matched, but why this song actually fits what the user is looking for, in terms a listener would recognize.
+4. **Create a `.env` file** in the project root:
+
+   ```
+   GEMINI_API_KEY=your_key_here
+   ```
+
+5. **Run the agent (RAG version):**
+
+   ```bash
+   python src/agent.py
+   ```
+
+6. **Run the non-RAG original (optional, for comparison):**
+
+   ```bash
+   cd src && python main.py
+   ```
+
+7. **Run the tests:**
+   ```bash
+   pytest tests/
+   ```
+
+---
+
+## Sample Interactions
+
+### Example 1 — The jazz/blues bridge (the motivating failure case)
+
+**Input (chat):**
+
+> I'm into moody jazz, something mellow, maybe 75 BPM, acoustic, not too intense — energy around 0.5.
+
+**Captured preferences:**
+
+```
+Genre: jazz, Mood: moody, Energy: 0.5, Tempo: 75 BPM, Acoustic: true
+```
+
+**Output (top 2 of 5):**
+
+![alt text](<Screenshot 2026-04-20 at 8.39.06 PM.jpg>)
+
+In v1 this query would have returned 0.0 on genre for every blues song. With the subgenre map, B.B. King surfaces at the top — exactly the failure mode the redesign was built to fix.
+
+### Example 2 — High-energy pop (clean match)
+
+**Input (chat):**
+
+> Give me something upbeat and happy, pop, really high energy like 0.9, around 128 BPM, not acoustic.
+
+**Output (top results):**
+![alt text](<Screenshot 2026-04-20 at 8.33.57 PM.jpg>)
+
+### Example 3 — Conflicting profile (lofi genre, intense mood):
+
+**Input (chat):**
+
+> I want lo-fi but something intense and high-energy, 140 BPM, not acoustic.
+> This was the main focus and motivation for why I wanted to improve upon the music recommender simulator. My previous calculation for getting the top k picks was a binary yes/no match regarding genre and numerics for energy and tempo.
+
+**Output:**
+
+First, here is when I ran main.py (the original scoring algorithm):
+
+![alt text](<Screenshot 2026-04-20 at 8.51.06 PM.jpg>)
+
+The scores are fairly middling, and are largely focused on the attributes that can be scored (energy, tempo). None of them have a genre match.
+
+This screenshot is when I ran agent.py (the revised algorithm):
+
+![alt text](<Screenshot 2026-04-20 at 8.50.54 PM.jpg>)
+
+Of particular note is that the top scoring song, "Lose yourself" by Eminem is considered a valid candidate now, thanks to the agent performing a genre mapping algorithm, acknowledging hip-hop is often intertwined with lofi so while it's not possible to get a genuine lofi song that has an intense mood, the recommender still tells you "you might like this song because its genre and lofi often go hand in hand."
+
+---
+
+### Example 4 — Subgenres
+
+**Input (chat):**
+
+> I want a jazz song but it's moody, 0.5 energy (lower end energy), acoustic, and a tempo of 75.
+> It is a blues song in every attribute EXCEPT genre.
+
+**Output:**
+
+First, here is when I ran main.py (the original scoring algorithm):
+
+![alt text](<Screenshot 2026-04-20 at 9.03.58 PM.jpg>)
+
+This screenshot is when I ran agent.py (the revised algorithm):
+
+![alt text](<Screenshot 2026-04-20 at 9.06.16 PM.jpg>)
+
+With the refactored algorithm, the agent goes "Hey wait, these songs basically are just blues! You should listen to these songs since besides genre, it's got everything you want!"
+
+---
+
+## Design Decisions
+
+**Why keep the numeric scorer under the LLM instead of replacing it?**
+The v1 scoring was one of my project's biggest strengths as it is fully transparent — every score decomposes into five components. Replacing it with "ask the LLM to rank the songs" would trade that transparency for a black box. The RAG layer sits _on top of_ the scorer: the LLM decides genre neighborhoods and writes explanations, but the actual ranking is still deterministic math.
+
+**Why let the LLM build the subgenre map at startup instead of hard-coding it?**
+Hard-coding `{"jazz": ["blues"], "hip-hop": ["rap"]}` would mean updating code every time the catalog grows. One startup call asks Gemma to look at the actual catalog genres and return a JSON map — this makes the system adapt to whatever data is loaded. The trade-off is a one-time API call cost and the occasional weird edge (e.g. does "indie pop" belong with "pop"? the model decides).
+
+**Why 0.7 partial credit for subgenre matches?**
+An exact genre match is 1.0, a totally unrelated genre is 0.0. 0.7 is high enough that a related genre can legitimately out-rank a non-matching one on genre alone, but low enough that two songs with the exact same genre preference still win. Tuning this value is the single biggest lever for how "adventurous" the recommendations feel.
+
+**Why a confirm-before-search step in the agent loop?**
+Gemma is good at conversation but occasionally mis-parses numbers (`0.9` becomes `9`, etc). The captured preferences are echoed back to the user before `recommend_songs` runs — one extra keystroke to catch drift. I chose friction over silent errors.
+
+**Why a guardrail against the model listing songs itself?**
+Without it, Gemma will happily invent songs that aren't in the catalog. The `^\s*\d+\.` regex in [agent.py:176](src/agent.py#L176) catches numbered lists in the reply and forces the model to emit a `RECOMMEND:` block instead. This was a case where letting the LLM speak freely was actively harmful.
+
+---
+
+## Testing Summary
+
+**What's automated.** [tests/test_recommender.py](tests/test_recommender.py) covers the core scoring contract with two tests: that `recommend()` returns songs sorted by score, and that `explain_recommendation()` returns a non-empty string. These run against the OOP `Recommender`/`UserProfile`/`Song` dataclasses and pass on the current implementation.
+
+**What I tested by hand.** Six user profiles across the pipeline — High-Energy Pop, Chill Lofi, Deep Intense Rock, Lofi Rager, Jazz Purist, and Hip-Hop Head (the last two are the genre-proximity failure cases from v1). Screenshots of each are in the repo root.
+
+**What worked.**
+
+- The subgenre map consistently surfaced blues for jazz queries and rap for hip-hop queries, which was the headline goal.
+- Wikipedia retrieval hits the right page ~80% of the time on mainstream songs (The Weeknd, Kendrick Lamar, Queen). The `is_song_page()` filter in [agent.py:40](src/agent.py#L40) catches most cases where it tries to hand back a movie or album page instead.
+- The `RECOMMEND:` JSON contract between Gemma and Python held up well — the five-field guard in `extract_recommend_json` cleanly rejects incomplete blocks.
+
+**What didn't.**
+
+- Wikipedia strikes out on obscure catalog tracks (`Sunrise City by Neon Echo`, `Library Rain by Paper Lanterns`) because those are fictional entries I added. The code degrades to a RAG-only explanation (no Wikipedia tag), which is acceptable but feels thinner.
+- Gemma occasionally ignores the "don't list songs yourself" rule on the first turn and has to be re-prompted by the guardrail. It's caught, but it's a round-trip of latency.
+- Conflicting profiles (lofi + intense) still produce mediocre results. The planned "dual-pass retrieval" from the v1 README isn't implemented — it's one of the things I'd build next.
+
+**What I learned.** LLM-assisted retrieval is best used for the fuzzy, linguistic parts of the problem (what's close to what, why does this fit) while crisp scoring stays deterministic. When I tried to push more of the ranking logic into the model, results got worse and harder to debug. The split — rules for math, model for meaning — held up better than I expected.
+
+---
+
+## Reflection
+
+The biggest shift in how I think about AI after this project: **the LLM is most useful where the rules are impossible to enumerate.** I spent the v1 version trying to list every genre relationship and gave up — there are too many and they're too fuzzy. One API call that returns `{"jazz": ["blues"], ...}` solved in seconds what a hand-written mapping couldn't.
+
+At the same time, the places where I let the model take over the most are the places I had to add the most guardrails. Gemma will invent songs if you let it. It will misread decimals. It will drift from the task if the conversation gets long. Every "smart" behavior I added to the agent came with a corresponding safety net (the guardrail regex, the confirm-preferences step, the JSON schema validation). The project ended up being as much about bounding the model as about using it.
+
+Problem-solving-wise, the lesson was to preserve what already works before adding AI on top. The v1 numeric scorer was transparent and correct for the cases it could handle. My first instinct was to replace it; my final design treats it as the foundation and uses the LLM to patch only the specific failure mode — binary genre matching — that the scorer couldn't solve on its own. Adding capability without removing legibility turned out to be the actual design problem.
+
+Where human judgment still matters: a score can tell you two songs share the same energy and tempo, but it can't tell you one is from a video game that defined someone's childhood. The RAG layer narrows the gap — a Wikipedia blurb at least gives the model _something_ to reason about — but it doesn't close it. Numbers describe a song's surface; what makes a song matter still lives somewhere no feature vector can reach.
