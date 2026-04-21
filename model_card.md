@@ -192,11 +192,22 @@ I had to patch the retrieval in two places: the `is_song_page` filter at [agent.
 
 ### System Limitations and Future Improvements
 
-What the RAG layer didn't fix, and what's next:
+#### What the RAG layer didn't fix, and what's next:
 
 - **Binary mood matching.** The subgenre map fixed binary _genre_ matching but mood is still 1.0 or 0.0 — "moody" vs "relaxed" scores zero even though they're close. **Fix:** apply the same startup LLM call pattern to build a mood-relationship map.
 - **Conflicting profiles still produce mediocre results.** A user asking for lofi + intense still gets a low-scoring compromise. **Fix:** implement the "dual-pass retrieval" I promised in v1 — split the top-k between the two conflicting preferences and explain the split.
 - **Wikipedia gaps on fictional catalog entries.** The RAG explanation degrades to attribute-only for the made-up songs, losing its best hook. **Fix:** hand-write (or AI-generate once and cache) a short blurb per song so every track has context regardless of Wikipedia coverage, or if I were to really take the recommender to another level, have it call another agent specifically assigned to looking up information on the song.
 - **RAG explanations aren't mechanically verified.** The "do not invent" instruction is prompt-only — if Gemma hallucinates, nothing catches it. **Fix:** add a self-critique pass where a second model call checks whether each claim in the explanation appears in the provided snippets, and rejects the explanation if not.
+
+#### Potential misuses:
+
+- **Off-task abuse**: A user could potentially try to repurpose the chatbot, asking it to write code, do homework or generate harmful content, as underneath it's a general-purpose LLM. I mitigiated potential off task abuse by adding guardrails framing Gemma to only focus on recommending music.
+- **API abuse if deployed publicly**: A hostile user could potentially spam the chat endpoint to burn through the API quota, belonging to whoever deployed the system
+
+#### Surprises encountered:
+
+- **Simplicity of guardrail implementation**: I was expecting to need complex code, specialized classifiers, validation chains to constratin the agent. In practice, however, natural language in the system prompt did most of the heavy lifting, telling Gemma "you are a music recommendation assistant" was all that was needed to deflect off-topic questions. It is impressive how intuitive AI can be that even people without much development experience can get the hang of it.
+
+- **Wikipedia failure reason**: Wikipedia potentially leading to disambiguation pages was the dominant failure mode, not quota or latency. Going in, I expected rate limits or slow responses to be my main issue. Instead, most RAG failures came from Wikipedia handing back the wrong article entirely — a film page, an album page, or a disambiguation list. The is_song_page filter was the single most important line of defensive code.
 
 Problem-solving-wise, the lesson was to weigh my original work with that of AI's suggestions, determine what had to go, what would be neat to add. The v1 numeric scorer was transparent and correct for the cases it could handle. My first instinct was to replace it; my final design treats it as the foundation and uses the LLM to patch only the specific failure mode — binary genre matching — that the scorer couldn't solve on its own. Adding capability without removing legibility turned out to be the actual design problem.
