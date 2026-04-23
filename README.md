@@ -18,7 +18,7 @@ This matters because the original v1 had a hard failure mode: binary genre match
 
 ## Architecture Overview
 
-![alt text](<Screenshot 2026-04-20 at 7.18.32 PM.jpg>)
+![alt text](<assets/Screenshot 2026-04-20 at 7.18.32 PM.jpg>)
 
 Three components, three jobs:
 
@@ -87,7 +87,7 @@ Genre: jazz, Mood: moody, Energy: 0.5, Tempo: 75 BPM, Acoustic: true
 
 **Output (top 2 of 5):**
 
-![alt text](<Screenshot 2026-04-20 at 8.39.06 PM.jpg>)
+![alt text](<assets/Screenshot 2026-04-20 at 8.39.06 PM.jpg>)
 
 In v1 this query would have returned 0.0 on genre for every blues song. With the subgenre map, B.B. King surfaces at the top — exactly the failure mode the redesign was built to fix.
 
@@ -98,7 +98,7 @@ In v1 this query would have returned 0.0 on genre for every blues song. With the
 > Give me something upbeat and happy, pop, really high energy like 0.9, around 128 BPM, not acoustic.
 
 **Output (top results):**
-![alt text](<Screenshot 2026-04-20 at 8.33.57 PM.jpg>)
+![alt text](<assets/Screenshot 2026-04-20 at 8.33.57 PM.jpg>)
 
 ### Example 3 — Conflicting profile (lofi genre, intense mood):
 
@@ -111,13 +111,13 @@ In v1 this query would have returned 0.0 on genre for every blues song. With the
 
 First, here is when I ran main.py (the original scoring algorithm):
 
-![alt text](<Screenshot 2026-04-20 at 8.51.06 PM.jpg>)
+![alt text](<assets/Screenshot 2026-04-20 at 8.51.06 PM.jpg>)
 
 The scores are fairly middling, and are largely focused on the attributes that can be scored (energy, tempo). None of them have a genre match.
 
 This screenshot is when I ran agent.py (the revised algorithm):
 
-![alt text](<Screenshot 2026-04-20 at 8.50.54 PM.jpg>)
+![alt text](<assets/Screenshot 2026-04-20 at 8.50.54 PM.jpg>)
 
 Of particular note is that the top scoring song, "Lose yourself" by Eminem is considered a valid candidate now, thanks to the agent performing a genre mapping algorithm, acknowledging hip-hop is often intertwined with lofi so while it's not possible to get a genuine lofi song that has an intense mood, the recommender still tells you "you might like this song because its genre and lofi often go hand in hand."
 
@@ -134,11 +134,11 @@ Of particular note is that the top scoring song, "Lose yourself" by Eminem is co
 
 First, here is when I ran main.py (the original scoring algorithm):
 
-![alt text](<Screenshot 2026-04-20 at 9.03.58 PM.jpg>)
+![alt text](<assets/Screenshot 2026-04-20 at 9.03.58 PM.jpg>)
 
 This screenshot is when I ran agent.py (the revised algorithm):
 
-![alt text](<Screenshot 2026-04-20 at 9.06.16 PM.jpg>)
+![alt text](<assets/Screenshot 2026-04-20 at 9.06.16 PM.jpg>)
 
 With the refactored algorithm, the agent goes "Hey wait, these songs basically are just blues! You should listen to these songs since besides genre, it's got everything you want!"
 
@@ -178,9 +178,9 @@ The system has four reliability mechanisms layered across input, output, and eva
 - The **Wikipedia disambiguation filter** [`is_song_page`](src/agent.py#L40) checks retrieved page summaries for phrases like `"is a song"`, `"single by"`, or `"recorded by"` before accepting them. This prevents film pages, album pages, or unrelated disambiguation drift from leaking into the RAG explanation — the RAG layer degrades to "no Wikipedia context" rather than explaining the song with irrelevant text.
 - The prompt in [llm_client.py:39-49](src/llm_client.py#L39) explicitly instructs the model to **"not invent any information not present in the snippets,"** grounding every generated explanation in the song attributes and (optional) Wikipedia summary that were actually retrieved.
 - **Input validation**: The system prompt at [agent.py:131-152](src/agent.py#L131) frames Gemma as "a friendly music recommendation assistant" whose job is narrowly defined as recommending songs from the catalog. This role-framing means off-topic questions get deflected back to the task rather than answered. In the example screenshot below, I asked the AI agent "how do I bake a cake?" and rather than go off topic, it re-iterated its question of what song attributes I wanted. I was inspired to add this feature after I learned how some people would abuse customer support agents to help them with math problems instead of inquiring about a product or doing anything the agent was meant to actually do.
-  - ![alt text](<Screenshot 2026-04-21 at 2.16.01 PM.jpg>)
+  - ![alt text](<assets/Screenshot 2026-04-21 at 2.16.01 PM.jpg>)
   - The next screenshot shows an example of a correct query. It has 5 parameters, and matches any of the available keywords/has the right typing.
-    - ![alt text](<Screenshot 2026-04-21 at 2.23.34 PM.jpg>)
+    - ![alt text](<assets/Screenshot 2026-04-21 at 2.23.34 PM.jpg>)
 
 **Evaluation script.**
 
@@ -229,9 +229,9 @@ I used AI in three concrete modes across this project:
 An AI suggestion that was helpful was adding guardrails around what data the agent was free to reference.
 
 - Prior to adding guardrails, the music recommender agent would output information not fed in by the dataset. For example, when I was looking for high energy pop, the AI response hallucinated artists and worst case scenario, songs not even in my csv file.
-  - ![alt text](<Screenshot 2026-04-21 at 2.49.42 PM.jpg>) (The artists Dua Lipa, Harry Styles, Lizzo, etc are not in my csv file).
+  - ![alt text](<assets/Screenshot 2026-04-21 at 2.49.42 PM.jpg>) (The artists Dua Lipa, Harry Styles, Lizzo, etc are not in my csv file).
 - Here is an example of a helpful recommendation. It's the same original prompt of high energy prompt but after I've added guardrails. There's less hallucinated information, all songs I checked are in the dataset.
-  - ![alt text](<Screenshot 2026-04-21 at 2.57.48 PM.jpg>)
+  - ![alt text](<assets/Screenshot 2026-04-21 at 2.57.48 PM.jpg>)
 
 ### Flawed AI Suggestion: Wikipedia-First Retrieval
 
