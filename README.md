@@ -231,7 +231,7 @@ An AI suggestion that was helpful was adding guardrails around what data the age
 - Prior to adding guardrails, the music recommender agent would output information not fed in by the dataset. For example, when I was looking for high energy pop, the AI response hallucinated artists and worst case scenario, songs not even in my csv file.
   - ![alt text](<assets/Screenshot 2026-04-21 at 2.49.42 PM.jpg>) (The artists Dua Lipa, Harry Styles, Lizzo, etc are not in my csv file).
 - Here is an example of a helpful recommendation. It's the same original prompt of high energy prompt but after I've added guardrails. There's less hallucinated information, all songs I checked are in the dataset.
-  - ![alt text](<assets/Screenshot 2026-04-21 at 2.57.48 PM.jpg>)
+  - ![alt text](<assets/Screenshot 2026-04-22 at 6.52.18 PM.jpg>)
 
 ### Flawed AI Suggestion: Wikipedia-First Retrieval
 
