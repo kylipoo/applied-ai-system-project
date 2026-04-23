@@ -31,30 +31,47 @@ load_dotenv()
 MODEL_NAME = "gemma-3-27b-it"
 
 
+USEFUL_SECTIONS = ["background", "recording", "composition", "music video", "reception", "legacy", "commercial performance"]
+
+
 def fetch_song_context(title: str, artist: str) -> str:
     """
-    Fetch a Wikipedia summary for a song, preferring the song page over
-    albums, films, or other disambiguation options.
+    Fetch a Wikipedia summary for a song plus any available background/reception
+    sections, preferring the song page over albums, films, or disambiguation pages.
     Returns empty string if nothing suitable is found.
     """
     def is_song_page(summary: str) -> bool:
         lower = summary.lower()
         return any(p in lower for p in ["is a song", "single by", "recorded by", "written by"])
 
+    def is_relevant_page(page, title: str, artist: str) -> bool:
+        text = page.summary.lower()
+        return title.lower() in text and artist.lower() in text
+
+    def extract_sections(page) -> str:
+        parts = [page.summary]
+        for section in page.sections:
+            if section.lower() in USEFUL_SECTIONS:
+                content = page.section(section)
+                if content:
+                    parts.append(f"{section}:\n{content}")
+        combined = "\n\n".join(parts)
+        return combined[:2000]
+
     queries = [f"{title} {artist} song", f"{title} song", f"{title} {artist}"]
 
     for query in queries:
         try:
             page = wikipedia.page(query, auto_suggest=True)
-            summary = page.summary[:600]
-            if is_song_page(summary):
-                return summary
+            if is_song_page(page.summary) and is_relevant_page(page, title, artist):
+                return extract_sections(page)
         except wikipedia.DisambiguationError as e:
             song_options = [opt for opt in e.options if "song" in opt.lower()]
             for opt in song_options:
                 try:
                     page = wikipedia.page(opt, auto_suggest=False)
-                    return page.summary[:600]
+                    if is_relevant_page(page, title, artist):
+                        return extract_sections(page)
                 except Exception:
                     continue
         except Exception:

@@ -1,4 +1,4 @@
-# VibeCheck 3.6 — RAG-Augmented Music Recommender
+# VibeCheck 3.6 — AI-Augmented Music Recommender
 
 ## Original Project (Modules 1–3)
 
@@ -10,7 +10,7 @@ The original scoring uses a weighted formula — 40% genre, 25% mood, 20% energy
 
 ## Title and Summary
 
-**VibeCheck 3.6** is a music recommender that now combines the original numeric scoring engine with a Retrieval-Augmented Generation (RAG) layer powered by Google's Gemma model. Instead of asking users to fill out a rigid preference form, a chat agent interviews the user in natural language, and every recommendation is explained with context pulled from the catalog and Wikipedia.
+**VibeCheck 3.6** is a music recommender that now combines the original numeric scoring engine with an AI layer powered by Google's Gemma model. Instead of asking users to fill out a rigid preference form, a chat agent interviews the user in natural language, and every recommendation is explained with context pulled from the catalog and Wikipedia.
 
 This matters because the original v1 had a hard failure mode: binary genre matching meant that asking for "jazz" buried every blues song at 0.0, even though the two genres share harmonic roots. The RAG layer fixes that failure directly by letting an LLM decide what counts as a neighboring genre, while keeping the transparent numeric scoring intact underneath.
 
@@ -52,13 +52,13 @@ Three components, three jobs:
    GEMINI_API_KEY=your_key_here
    ```
 
-5. **Run the agent (RAG version):**
+5. **Run the agent (enhanced version):**
 
    ```bash
    python src/agent.py
    ```
 
-6. **Run the non-RAG original (optional, for comparison):**
+6. **Run the original (optional, for comparison):**
 
    ```bash
    cd src && python main.py
@@ -176,7 +176,7 @@ The system has four reliability mechanisms layered across input, output, and eva
 
 - The **hallucinated-songs guardrail** at [agent.py:176-187](src/agent.py#L176) uses the regex `^\s*\d+\.` to detect numbered lists in Gemma's reply and re-prompts the model to emit a `RECOMMEND:` block instead. Without this, Gemma will happily invent songs that aren't in the catalog; with it, the only songs a user ever sees are ones that came out of the deterministic scorer.
 - The **Wikipedia disambiguation filter** [`is_song_page`](src/agent.py#L40) checks retrieved page summaries for phrases like `"is a song"`, `"single by"`, or `"recorded by"` before accepting them. This prevents film pages, album pages, or unrelated disambiguation drift from leaking into the RAG explanation — the RAG layer degrades to "no Wikipedia context" rather than explaining the song with irrelevant text.
-- The RAG prompt in [llm_client.py:39-49](src/llm_client.py#L39) explicitly instructs the model to **"not invent any information not present in the snippets,"** grounding every generated explanation in the song attributes and (optional) Wikipedia summary that were actually retrieved.
+- The prompt in [llm_client.py:39-49](src/llm_client.py#L39) explicitly instructs the model to **"not invent any information not present in the snippets,"** grounding every generated explanation in the song attributes and (optional) Wikipedia summary that were actually retrieved.
 - **Input validation**: The system prompt at [agent.py:131-152](src/agent.py#L131) frames Gemma as "a friendly music recommendation assistant" whose job is narrowly defined as recommending songs from the catalog. This role-framing means off-topic questions get deflected back to the task rather than answered. In the example screenshot below, I asked the AI agent "how do I bake a cake?" and rather than go off topic, it re-iterated its question of what song attributes I wanted. I was inspired to add this feature after I learned how some people would abuse customer support agents to help them with math problems instead of inquiring about a product or doing anything the agent was meant to actually do.
   - ![alt text](<Screenshot 2026-04-21 at 2.16.01 PM.jpg>)
   - The next screenshot shows an example of a correct query. It has 5 parameters, and matches any of the available keywords/has the right typing.
@@ -202,7 +202,7 @@ The system has four reliability mechanisms layered across input, output, and eva
 
 **What didn't.**
 
-- Wikipedia strikes out on obscure catalog tracks (`Sunrise City by Neon Echo`, `Library Rain by Paper Lanterns`) because those are fictional entries I added. The code degrades to a RAG-only explanation (no Wikipedia tag), which is acceptable but feels thinner. My compromise was that when relevant, add examples of what album the song was in, or when they were played, to give them a sense of prestige/appeal.
+- Wikipedia strikes out on obscure catalog tracks (`Sunrise City by Neon Echo`, `Library Rain by Paper Lanterns`) because those are fictional entries I added. The code degrades to looking for vaguely related articles,returns warning messages of no explicitly identified parsers.
 - Gemma occasionally ignores the "don't list songs yourself" rule on the first turn and has to be re-prompted by the guardrail. It's caught, but it's a round-trip of latency.
 - Conflicting profiles (lofi + intense) still produce mediocre results. The planned "dual-pass retrieval" from the v1 README isn't implemented — it's one of the things I'd build next.
 
@@ -235,12 +235,13 @@ An AI suggestion that was helpful was adding guardrails around what data the age
 
 ### Flawed AI Suggestion: Wikipedia-First Retrieval
 
-When I was designing the RAG layer, AI proposed a clean Wikipedia-backed retrieval format that assumed every song in the catalog would have a dedicated Wikipedia article — one `wikipedia.page(title)` call returns the summary, done. In practice this broke in two places:
+When I was designing the RAG layer, AI proposed a clean Wikipedia-backed retrieval format that assumed every song in the catalog would have a dedicated Wikipedia article — one `wikipedia.page(title)` call returns the summary, done. In practice this broke in three places:
 
 1. **Fictional catalog entries.** Roughly half the catalog is lesser known tracks (Sunrise City, Library Rain, Focus Flow). These have no Wikipedia page at all, so the call just errored out.
-2. **Disambiguation pages.** Even for real songs, a title often maps to multiple articles (film, album, unrelated song). The naive retrieval returned malformed responses or the wrong article entirely when Wikipedia served a disambiguation page.
+2. **Disambiguation pages.** Even for real songs, a title often maps to multiple articles (film, album, unrelated song). The naive retrieval returned malformed responses or the wrong article entirely when Wikipedia served a disambiguation page. In one case, searching for "Library Rain" returned the Wikipedia page for "Purple Rain" by Prince — a completely different song — because it passed the basic "is this a song page?" check but nothing verified it was the _right_ song.
+3. **Shallow explanations even when retrieval succeeded.** The initial suggestion used only the Wikipedia summary and instructed the model to add "one sentence of real-world context." When I tested this, the RAG explanations were barely better than the attribute-only fallback — the model was just rephrasing the numeric data rather than saying anything meaningful about the song itself.
 
-I had to patch the retrieval in two places: the `is_song_page` filter at [agent.py:40-42](src/agent.py#L40) that checks summary text for phrases like "is a song", "single by", or "recorded by" before accepting a result, and the `DisambiguationError` handler at [agent.py:52-59](src/agent.py#L52) that walks the disambiguation options and picks the one labeled "song." The lesson: when AI suggests pulling from an external knowledge source, it tends to assume the source is complete and unambiguous. Neither is usually true.
+I had to patch the retrieval in three places. The `is_song_page` filter at [agent.py:43-45](src/agent.py#L43) checks that the summary contains phrases like "is a song", "single by", or "recorded by" before accepting a result. The `DisambiguationError` handler at [agent.py:64-71](src/agent.py#L64) walks disambiguation options and picks ones labeled "song." And the `is_relevant_page` check at [agent.py:47-49](src/agent.py#L47) verifies that both the song title and artist name actually appear in the retrieved page — which is what caught the Purple Rain problem. For the shallow explanations, I expanded retrieval to pull named sections like `background`, `reception`, and `legacy` in addition to the summary, and updated the prompt to allow up to two sentences of Wikipedia context with the instruction to prefer specific details over vague praise. The lesson: when AI suggests pulling from an external knowledge source, it tends to assume the source is complete, unambiguous, and rich enough to be useful on its own. None of those held up.
 
 ### System Limitations and Future Improvements
 
@@ -250,6 +251,7 @@ I had to patch the retrieval in two places: the `is_song_page` filter at [agent.
 - **Conflicting profiles still produce mediocre results.** A user asking for lofi + intense still gets a low-scoring compromise. **Fix:** implement the "dual-pass retrieval" I promised in v1 — split the top-k between the two conflicting preferences and explain the split.
 - **Wikipedia gaps on fictional catalog entries.** The RAG explanation degrades to attribute-only for the made-up songs, losing its best hook. **Fix:** hand-write (or AI-generate once and cache) a short blurb per song so every track has context regardless of Wikipedia coverage, or if I were to really take the recommender to another level, have it call another agent specifically assigned to looking up information on the song.
 - **RAG explanations aren't mechanically verified.** The "do not invent" instruction is prompt-only — if Gemma hallucinates, nothing catches it. **Fix:** add a self-critique pass where a second model call checks whether each claim in the explanation appears in the provided snippets, and rejects the explanation if not.
+- **Can't prove which tracks are real.** Claude added some songs like "Gym Hero" by Max Pulse into the songs csv file, but the recommender treats it the same as real tracks from the likes of Eminem, Kendrick Lamar. So while I have addressed the agent making up songs outside the dataset, there hasn't been anything done for when the dataset itself has holes. This relates to the wikipedia gap in the sense that I would use multiple sources to verify if the song in the dataset is real or not.
 
 #### Potential misuses:
 
