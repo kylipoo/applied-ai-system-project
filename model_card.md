@@ -177,16 +177,16 @@ I used AI in three concrete modes across this project:
 An AI suggestion that was helpful was adding guardrails around what data the agent was free to reference.
 
 - Prior to adding guardrails, the music recommender agent would output information not fed in by the dataset. For example, when I was looking for high energy pop, the AI response hallucinated artists and worst case scenario, songs not even in my csv file.
-  - ![alt text](<Screenshot 2026-04-21 at 2.49.42 PM.jpg>) (The artists Dua Lipa, Harry Styles, Lizzo, etc are not in my csv file).
+  - ![alt text](<assets/Screenshot 2026-04-21 at 2.49.42 PM.jpg>) (The artists Dua Lipa, Harry Styles, Lizzo, etc are not in my csv file).
 - Here is an example of a helpful recommendation. It's the same original prompt of high energy prompt but after I've added guardrails. There's less hallucinated information, all songs I checked are in the dataset.
-  - ![alt text](<Screenshot 2026-04-21 at 2.57.48 PM.jpg>)
+  - ![alt text](<assets/Screenshot 2026-04-22 at 6.52.18 PM.jpg>)
 
 ### Flawed AI Suggestion: Wikipedia-First Retrieval
 
 When I was designing the RAG layer, AI proposed a clean Wikipedia-backed retrieval format that assumed every song in the catalog would have a dedicated Wikipedia article — one `wikipedia.page(title)` call returns the summary, done. In practice this broke in three places:
 
 1. **Fictional catalog entries.** Roughly half the catalog is lesser known tracks (Sunrise City, Library Rain, Focus Flow). These have no Wikipedia page at all, so the call just errored out.
-2. **Disambiguation pages.** Even for real songs, a title often maps to multiple articles (film, album, unrelated song). The naive retrieval returned malformed responses or the wrong article entirely when Wikipedia served a disambiguation page. In one case, searching for "Library Rain" returned the Wikipedia page for "Purple Rain" by Prince — a completely different song — because it passed the basic "is this a song page?" check but nothing verified it was the *right* song.
+2. **Disambiguation pages.** Even for real songs, a title often maps to multiple articles (film, album, unrelated song). The naive retrieval returned malformed responses or the wrong article entirely when Wikipedia served a disambiguation page. In one case, searching for "Library Rain" returned the Wikipedia page for "Purple Rain" by Prince — a completely different song — because it passed the basic "is this a song page?" check but nothing verified it was the _right_ song.
 3. **Shallow explanations even when retrieval succeeded.** The initial suggestion used only the Wikipedia summary and instructed the model to add "one sentence of real-world context." When I tested this, the RAG explanations were barely better than the attribute-only fallback — the model was just rephrasing the numeric data rather than saying anything meaningful about the song itself.
 
 I had to patch the retrieval in three places. The `is_song_page` filter at [agent.py:43-45](src/agent.py#L43) checks that the summary contains phrases like "is a song", "single by", or "recorded by" before accepting a result. The `DisambiguationError` handler at [agent.py:64-71](src/agent.py#L64) walks disambiguation options and picks ones labeled "song." And the `is_relevant_page` check at [agent.py:47-49](src/agent.py#L47) verifies that both the song title and artist name actually appear in the retrieved page — which is what caught the Purple Rain problem. For the shallow explanations, I expanded retrieval to pull named sections like `background`, `reception`, and `legacy` in addition to the summary, and updated the prompt to allow up to two sentences of Wikipedia context with the instruction to prefer specific details over vague praise. The lesson: when AI suggests pulling from an external knowledge source, it tends to assume the source is complete, unambiguous, and rich enough to be useful on its own. None of those held up.
