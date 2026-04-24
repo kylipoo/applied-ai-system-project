@@ -71,6 +71,12 @@ Three components, three jobs:
 
 ---
 
+## Sample Demonstration:
+
+### Loom Recording:
+
+https://www.loom.com/share/9559844e3c3c4f40acb3466aa7d7187c
+
 ## Sample Interactions
 
 ### Example 1 — The jazz/blues bridge (the motivating failure case)
