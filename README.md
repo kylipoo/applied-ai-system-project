@@ -64,12 +64,6 @@ Three components, three jobs:
    cd src && python main.py
    ```
 
-7. **Run the tests:**
-   ```bash
-   pytest tests/
-   ```
-
----
 
 ## Sample Demonstration:
 
